@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  /* Luftansa brand palette */
+  --brand-ivory: #fffdf8;
+  --brand-cream: #f8f5ec;
+  --brand-black: #171717;
+  --brand-gold: #c6a76a;
+  --brand-text: #292d27;
+
+  --background: var(--brand-ivory);
+  --foreground: var(--brand-text);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand-ivory: var(--brand-ivory);
+  --color-brand-cream: var(--brand-cream);
+  --color-brand-black: var(--brand-black);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-text: var(--brand-text);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
