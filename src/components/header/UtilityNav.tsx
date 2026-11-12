@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Heart, Search, ShoppingBag, User, type LucideIcon } from "lucide-react";
+import { Heart, ShoppingBag, User, type LucideIcon } from "lucide-react";
 import { UTILITY_LINKS } from "./nav-config";
+import { SearchToggle } from "./SearchToggle";
 
-const ITEMS: { label: string; href: string; Icon: LucideIcon; hideOnMobile?: boolean }[] = [
-  { ...UTILITY_LINKS.search, Icon: Search },
+const LINKS: { label: string; href: string; Icon: LucideIcon; hideOnMobile?: boolean }[] = [
   { ...UTILITY_LINKS.account, Icon: User, hideOnMobile: true },
   { ...UTILITY_LINKS.wishlist, Icon: Heart, hideOnMobile: true },
   { ...UTILITY_LINKS.cart, Icon: ShoppingBag },
@@ -12,7 +12,11 @@ const ITEMS: { label: string; href: string; Icon: LucideIcon; hideOnMobile?: boo
 export function UtilityNav() {
   return (
     <ul aria-label="Shop tools" className="-mr-2 flex items-center sm:gap-1">
-      {ITEMS.map(({ label, href, Icon, hideOnMobile }) => (
+      {/* On lg+ the inline search field in the logo row replaces this icon. */}
+      <li className="lg:hidden">
+        <SearchToggle />
+      </li>
+      {LINKS.map(({ label, href, Icon, hideOnMobile }) => (
         <li key={href} className={hideOnMobile ? "hidden sm:block" : undefined}>
           <Link
             href={href}

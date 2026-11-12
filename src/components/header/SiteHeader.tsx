@@ -22,7 +22,7 @@ export function SiteHeader() {
       <AnnouncementBar />
       <BrandLogo />
 
-      <div className="border-y border-brand-gold/25 bg-brand-ivory">
+      <div className="relative border-y border-brand-gold/25 bg-brand-ivory">
         <div className="mx-auto grid h-14 max-w-7xl lg:h-16 grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-6 lg:px-8">
           <div className="justify-self-start">
             <MobileMenu />

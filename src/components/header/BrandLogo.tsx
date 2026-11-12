@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BRAND_ASSETS, getAssetUrl } from "@/lib/assets";
+import { SearchForm } from "./SearchForm";
 
 const logo = BRAND_ASSETS.logo;
 
@@ -31,7 +32,9 @@ const imageStyle = {
 export function BrandLogo() {
   return (
     <div className="bg-brand-ivory">
-      <div className="mx-auto flex max-w-7xl justify-center px-4 py-2 sm:py-2.5 lg:py-3">
+      {/* Equal 1fr side columns keep the logo exactly centred; search sits right. */}
+      <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-1.5 sm:px-6 sm:py-2 lg:px-8 lg:py-2.5">
+        <div aria-hidden="true" />
         <Link
           href="/"
           aria-label="Luftansa — home"
@@ -54,6 +57,10 @@ export function BrandLogo() {
             />
           </span>
         </Link>
+        <SearchForm
+          id="header-search"
+          className="hidden w-[200px] justify-self-end self-start lg:mt-2 lg:block xl:w-[220px]"
+        />
       </div>
     </div>
   );
