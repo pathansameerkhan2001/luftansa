@@ -22,6 +22,7 @@
   --color-brand-text: var(--brand-text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-cormorant), "Times New Roman", Georgia, serif;
 
   /* Announcement ticker: track = two identical halves, so -50% loops seamlessly. */
   --animate-marquee: marquee 90s linear infinite;

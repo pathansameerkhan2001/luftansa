@@ -1,7 +1,11 @@
-/**
- * Homepage. Intentionally empty for now — the hero and homepage sections will be
- * added in a later phase. The ivory background comes from the body.
- */
+import { BenefitsStrip } from "@/components/benefits/BenefitsStrip";
+import { HeroSection } from "@/components/hero/HeroSection";
+
 export default function Home() {
-  return <main aria-label="Homepage content" className="min-h-[60vh]" />;
+  return (
+    <main>
+      <HeroSection />
+      <BenefitsStrip />
+    </main>
+  );
 }
