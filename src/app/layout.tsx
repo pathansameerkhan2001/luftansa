@@ -1,25 +1,28 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Geist, Geist_Mono } from "next/font/google";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
+import localFont from "next/font/local";
 import "./globals.css";
 import { SiteHeader } from "@/components/header/SiteHeader";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+// Geist + Geist Mono are self-hosted via Vercel's official `geist` package
+// (SIL OFL 1.1). They expose --font-geist-sans / --font-geist-mono.
+const geistSans = GeistSans;
+const geistMono = GeistMono;
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Editorial serif for headings (hero, section titles).
-const cormorant = Cormorant_Garamond({
+// Editorial serif for headings (hero, section titles). Self-hosted (SIL OFL 1.1,
+// see fonts/cormorant-garamond/OFL.txt) so builds never depend on Google Fonts.
+const cormorant = localFont({
   variable: "--font-cormorant",
-  subsets: ["latin"],
-  weight: ["500", "600"],
-  style: ["normal", "italic"],
+  src: [
+    { path: "./fonts/cormorant-garamond/cormorant-garamond-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/cormorant-garamond/cormorant-garamond-latin-500-italic.woff2", weight: "500", style: "italic" },
+    { path: "./fonts/cormorant-garamond/cormorant-garamond-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/cormorant-garamond/cormorant-garamond-latin-600-italic.woff2", weight: "600", style: "italic" },
+  ],
   display: "swap",
+  fallback: ["Times New Roman", "Georgia", "serif"],
+  adjustFontFallback: "Times New Roman",
 });
 
 export const metadata: Metadata = {
