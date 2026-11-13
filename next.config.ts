@@ -2,7 +2,10 @@ import type { NextConfig } from "next";
 import type { RemotePattern } from "next/dist/shared/lib/image-config";
 
 // Optional CloudFront (or other CDN) origin for S3 assets. Server-side only.
-const cdnPatterns: RemotePattern[] = [];
+const cdnPatterns: RemotePattern[] = [
+  // Interim hero photography (Unsplash License) until Luftansa photos are in S3.
+  { protocol: "https", hostname: "images.unsplash.com" },
+];
 if (process.env.ASSET_CDN_URL) {
   const { protocol, hostname } = new URL(process.env.ASSET_CDN_URL);
   cdnPatterns.push({ protocol: protocol.replace(":", "") as "http" | "https", hostname });

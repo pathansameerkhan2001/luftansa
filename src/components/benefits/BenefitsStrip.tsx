@@ -2,7 +2,7 @@ import { Clock, Gem, Gift, type LucideIcon } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 
 /** Line-art perfume bottle drawn to match Lucide's 24px / stroke style. */
-function PerfumeBottleIcon(props: SVGProps<SVGSVGElement>) {
+export function PerfumeBottleIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
