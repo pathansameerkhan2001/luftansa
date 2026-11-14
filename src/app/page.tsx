@@ -1,13 +1,15 @@
 import { BenefitsStrip } from "@/components/benefits/BenefitsStrip";
-import { SignatureCollection } from "@/components/collection/SignatureCollection";
+import { HomeCollections } from "@/components/collection/HomeCollections";
 import { HeroSection } from "@/components/hero/HeroSection";
+import { ExploreByNotes } from "@/components/notes/ExploreByNotes";
 
 export default function Home() {
   return (
     <main>
       <HeroSection />
-      <SignatureCollection />
       <BenefitsStrip />
+      <HomeCollections />
+      <ExploreByNotes />
     </main>
   );
 }

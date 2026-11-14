@@ -48,6 +48,42 @@ export const PRODUCTS: readonly Product[] = [
 /** Products featured in the homepage "Signature Fragrances" section. */
 export const SIGNATURE_PRODUCT_SLUGS = ["black-velvet", "downtown-tam", "oud-forest"] as const;
 
+/**
+ * Personality Collection membership. Source: the approved homepage design,
+ * which places Black Velvet and Downtown Tam in this collection. Add further
+ * slugs only once their collection is confirmed.
+ */
+export const PERSONALITY_COLLECTION_SLUGS = ["black-velvet", "downtown-tam"] as const;
+
+/**
+ * Roll-on perfumes (a separate format from the spray bottles above).
+ *
+ * Roll-ons do NOT inherit STANDARD_PRICES_INR: every variant carries its own
+ * confirmed price. Only list products confirmed to exist as roll-ons, e.g.
+ *   {
+ *     slug: "black-velvet-roll-on",
+ *     name: "Black Velvet",
+ *     variants: [{ label: "8 ml", priceInr: 0 }],
+ *     image: { key: "products/roll-on/black-velvet.jpg", alt: "Luftansa Black Velvet roll-on" },
+ *   }
+ * While this list is empty the Roll On Collection shows a "coming soon" state.
+ */
+export interface RollOnVariant {
+  /** Display label, e.g. "8 ml". */
+  label: string;
+  /** Confirmed price in INR for this variant. */
+  priceInr: number;
+}
+
+export interface RollOnProduct {
+  slug: string;
+  name: string;
+  variants: readonly RollOnVariant[];
+  image?: ProductImage;
+}
+
+export const ROLL_ON_PRODUCTS: readonly RollOnProduct[] = [];
+
 export function getProductsBySlugs(slugs: readonly string[]): Product[] {
   return slugs
     .map((slug) => PRODUCTS.find((p) => p.slug === slug))

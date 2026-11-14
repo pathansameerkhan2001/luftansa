@@ -1,5 +1,5 @@
-import { getAssetUrl } from "@/lib/assets";
 import { getProductsBySlugs, SIGNATURE_PRODUCT_SLUGS } from "@/data/products";
+import { toSprayCardData } from "./HomeCollections";
 import { ProductCard, type ProductCardData } from "./ProductCard";
 
 /**
@@ -7,12 +7,7 @@ import { ProductCard, type ProductCardData } from "./ProductCard";
  * from src/data/products.ts; S3 image keys resolve to URLs on the server.
  */
 export function SignatureCollection({ slugs = SIGNATURE_PRODUCT_SLUGS }: { slugs?: readonly string[] }) {
-  const products: ProductCardData[] = getProductsBySlugs(slugs).map(({ image, ...p }) => ({
-    ...p,
-    image: image
-      ? { src: getAssetUrl(image.key), alt: image.alt, objectPosition: image.objectPosition }
-      : undefined,
-  }));
+  const products: ProductCardData[] = getProductsBySlugs(slugs).map(toSprayCardData);
 
   if (products.length === 0) return null;
 
