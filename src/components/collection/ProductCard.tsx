@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
 import { AddToCartButton, ImageSizeLabels, PricePanel } from "@/components/pricing/PurchaseControls";
@@ -15,6 +16,8 @@ export interface ProductCardData {
   slug: string;
   name: string;
   description?: string;
+  /** Product details page, when it exists. */
+  href?: string;
   options: readonly ProductOption[];
   image?: { src: string; alt: string; objectPosition?: string };
 }
@@ -26,7 +29,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, placeholder = "spray" }: ProductCardProps) {
-  const { slug, name, description, options, image } = product;
+  const { slug, name, description, href, options, image } = product;
   const [optionId, setOptionId] = useState<string | undefined>(options[0]?.id);
   const [wishlisted, setWishlisted] = useState(false);
   const [status, setStatus] = useState("");
@@ -88,7 +91,16 @@ export function ProductCard({ product, placeholder = "spray" }: ProductCardProps
       {/* Details */}
       <div className="flex flex-1 flex-col px-1.5 pt-3.5 pb-1.5 sm:px-2.5 sm:pt-4 sm:pb-1.5">
         <h3 className="font-serif lining-nums text-[22px] leading-tight font-semibold text-brand-black sm:text-[23px]">
-          {name}
+          {href ? (
+            <Link
+              href={href}
+              className="decoration-brand-gold/70 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold"
+            >
+              {name}
+            </Link>
+          ) : (
+            name
+          )}
         </h3>
         {description ? (
           <p className="mt-1.5 text-[14px] leading-relaxed text-brand-text/75">{description}</p>

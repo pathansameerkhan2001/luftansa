@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
@@ -13,6 +14,8 @@ type NoteTier = "top" | "middle" | "base";
 export interface BestSellerItem {
   slug: string;
   name: string;
+  /** Product details page, when it exists. */
+  href?: string;
   options: readonly ProductOption[];
   image?: { src: string; alt: string; objectPosition?: string };
   perfectFor?: string;
@@ -284,6 +287,15 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
               </li>
             ))}
         </ul>
+        {item.href ? (
+          <Link
+            href={item.href}
+            className="mt-2.5 inline-flex items-center gap-1 text-[12.5px] font-semibold tracking-[0.06em] text-brand-black underline decoration-brand-gold/70 underline-offset-4 hover:decoration-brand-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold"
+          >
+            View full details
+            <span className="sr-only">: {item.name}</span>
+          </Link>
+        ) : null}
         <p className={`mt-3 text-[14.5px] font-semibold ${ACCENT_TEXT} sm:text-[15px]`}>
           Perfect for:{" "}
           {item.perfectFor ?? <span className="font-normal text-brand-text/55 italic">details coming soon</span>}

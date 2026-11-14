@@ -13,7 +13,10 @@ export interface AddToCartDetail {
   name: string;
   optionId: string;
   optionLabel: string;
+  /** Unit price. */
   priceInr: number;
+  /** Defaults to 1. */
+  quantity?: number;
 }
 
 export function dispatchAddToCart(detail: AddToCartDetail) {

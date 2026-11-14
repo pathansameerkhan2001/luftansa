@@ -49,7 +49,12 @@ export interface Product {
   description?: string;
   /** Confirmed bottle sizes for this product, in display order. */
   sizes: readonly BottleSizeMl[];
+  /** Main photograph (S3). */
   image?: ProductImage;
+  /** Additional genuine photographs for the product page gallery (S3). */
+  gallery?: readonly ProductImage[];
+  /** Confirmed product type label, e.g. "Eau de Parfum", "Attar". Defaults to "Perfume". */
+  category?: string;
   /** Confirmed MRP per size. Shown struck through only when above the selling price. */
   mrpInr?: Partial<Record<BottleSizeMl, number>>;
   /** Confirmed promotional offers. */

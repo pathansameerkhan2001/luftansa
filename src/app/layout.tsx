@@ -3,6 +3,7 @@ import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import localFont from "next/font/local";
 import "./globals.css";
+import { SiteFooter } from "@/components/footer/SiteFooter";
 import { SiteHeader } from "@/components/header/SiteHeader";
 
 // Geist + Geist Mono are self-hosted via Vercel's official `geist` package
@@ -44,6 +45,7 @@ export default function RootLayout({
         <div id="main-content" tabIndex={-1} className="outline-none">
           {children}
         </div>
+        <SiteFooter />
       </body>
     </html>
   );

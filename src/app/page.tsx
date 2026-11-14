@@ -5,6 +5,7 @@ import { HeroSection } from "@/components/hero/HeroSection";
 import { ExploreByNotes } from "@/components/notes/ExploreByNotes";
 import { InstagramReels } from "@/components/reels/InstagramReels";
 import { BrandStory } from "@/components/story/BrandStory";
+import { FaqSection } from "@/components/faq/FaqSection";
 
 export default function Home() {
   return (
@@ -16,6 +17,7 @@ export default function Home() {
       <BestSellers />
       <InstagramReels />
       <BrandStory />
+      <FaqSection />
     </main>
   );
 }

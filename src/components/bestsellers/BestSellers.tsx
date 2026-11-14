@@ -2,6 +2,7 @@ import Image from "next/image";
 import { FlourishIcon } from "@/components/collection/icons";
 import { HERO_BANNER } from "@/components/hero/hero-banner";
 import { getAssetUrl } from "@/lib/assets";
+import { productHref } from "@/lib/routes";
 import { BEST_SELLER_SLUGS, getProductsBySlugs, sprayOptions } from "@/data/products";
 import { FRAGRANCE_PROFILES, getNoteImage, type NoteTier } from "@/data/fragrance-profiles";
 import { BestSellersShowcase, type BestSellerItem } from "./BestSellersShowcase";
@@ -14,6 +15,7 @@ function buildItems(): BestSellerItem[] {
     return {
       slug: product.slug,
       name: product.name,
+      href: productHref(product.slug),
       // Spray perfumes: confirmed sizes at the standard price list (+ configured MRP/offers).
       options: sprayOptions(product),
       concentration: product.concentration,

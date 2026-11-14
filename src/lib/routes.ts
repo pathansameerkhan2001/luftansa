@@ -13,8 +13,8 @@ import type { CollectionSlug } from "@/data/reels";
 
 type RouteBuilder = ((slug: string) => string) | null;
 
-/** Product detail page. Not built yet. */
-export const PRODUCT_DETAIL_ROUTE: RouteBuilder = null;
+/** Product detail page: src/app/products/[slug]/page.tsx */
+export const PRODUCT_DETAIL_ROUTE: RouteBuilder = (slug) => `/products/${slug}`;
 
 /** Collection listing page. Not built yet. */
 export const COLLECTION_ROUTE: RouteBuilder = null;

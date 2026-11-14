@@ -1,4 +1,5 @@
 import { getAssetUrl } from "@/lib/assets";
+import { productHref } from "@/lib/routes";
 import {
   getProductsBySlugs,
   PERSONALITY_COLLECTION_SLUGS,
@@ -19,6 +20,7 @@ export function toSprayCardData(product: Product): ProductCardData {
     slug,
     name,
     description,
+    href: productHref(slug),
     options: sprayOptions(product),
     image: image ? { src: getAssetUrl(image.key), alt: image.alt, objectPosition: image.objectPosition } : undefined,
   };
