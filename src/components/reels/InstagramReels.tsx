@@ -1,6 +1,6 @@
 import { getAssetUrl } from "@/lib/assets";
 import { collectionHref, isCatalogueProduct, productHref } from "@/lib/routes";
-import { INSTAGRAM_PROFILE_URL, REELS, type Reel } from "@/data/reels";
+import { INSTAGRAM_PROFILE_URL, REEL_PLACEHOLDER_COUNT, REELS, type Reel } from "@/data/reels";
 import { InstagramGlyph } from "./InstagramGlyph";
 import { ReelsCarousel, type ResolvedReel } from "./ReelsCarousel";
 
@@ -31,10 +31,22 @@ function resolveReel(reel: Reel): ResolvedReel {
   };
 }
 
-/** "On Instagram / Luftansa Fragrance Moments" (Server Component). Hidden until Reels exist. */
+/** Neutral, non-interactive cards shown until real Reels are configured. */
+function placeholderReels(count: number): ResolvedReel[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `placeholder-${i + 1}`,
+    title: "Luftansa Reel coming soon",
+    placeholder: true,
+  }));
+}
+
+/**
+ * "On Instagram / Luftansa Fragrance Moments" (Server Component). Always
+ * rendered: real Reels when configured, otherwise "coming soon" placeholders.
+ */
 export function InstagramReels({ reels = REELS }: { reels?: readonly Reel[] }) {
-  if (reels.length === 0) return null;
-  const items = reels.map(resolveReel);
+  const isPlaceholder = reels.length === 0;
+  const items = isPlaceholder ? placeholderReels(REEL_PLACEHOLDER_COUNT) : reels.map(resolveReel);
 
   return (
     <section aria-labelledby="reels-heading" className="relative overflow-hidden bg-brand-ivory">
@@ -66,6 +78,11 @@ export function InstagramReels({ reels = REELS }: { reels?: readonly Reel[] }) {
 
         <div className="mt-10 sm:mt-12">
           <ReelsCarousel reels={items} />
+          {isPlaceholder ? (
+            <p className="mt-4 text-center text-[12.5px] tracking-[0.04em] text-brand-text/60">
+              New Luftansa Reels are coming soon.
+            </p>
+          ) : null}
         </div>
 
         {INSTAGRAM_PROFILE_URL ? (

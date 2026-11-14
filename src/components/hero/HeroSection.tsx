@@ -1,4 +1,4 @@
-import { BRAND_ASSETS, getAssetUrl } from "@/lib/assets";
+import { getAssetUrl } from "@/lib/assets";
 import { HERO_SLIDES, type HeroBannerConfig } from "./hero-banner";
 import { HeroStage, type ResolvedHeroImage } from "./HeroStage";
 
@@ -7,8 +7,8 @@ interface HeroSectionProps {
 }
 
 /**
- * Image-only, full-width hero (Server Component). No text or overlays besides
- * the decorative hummingbird + flower flourish made from the original logo.
+ * Image-only, full-width hero (Server Component). No text, controls or
+ * overlays (a pause control appears only when several slides rotate).
  * S3 keys resolve on the server (CloudFront or the private /media route).
  *
  * The previous text carousel (HeroCarousel + hero-slides) is kept in this folder
@@ -21,5 +21,5 @@ export function HeroSection({ slides = HERO_SLIDES }: HeroSectionProps) {
   });
   if (resolved.length === 0) return null;
 
-  return <HeroStage slides={resolved} logoSrc={getAssetUrl(BRAND_ASSETS.logo.key)} />;
+  return <HeroStage slides={resolved} />;
 }

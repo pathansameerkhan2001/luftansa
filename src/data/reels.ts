@@ -18,7 +18,9 @@
  *     productSlug: "black-velvet",
  *   }
  *
- * The section stays hidden while REELS is empty.
+ * While REELS is empty the section still renders, showing REEL_PLACEHOLDER_COUNT
+ * neutral "coming soon" cards (non-interactive: no links, no Shop Now). They
+ * are replaced automatically as soon as real Reels are added here.
  */
 import type { NoteSlug } from "./note-categories";
 
@@ -48,3 +50,6 @@ export interface Reel {
 export const INSTAGRAM_PROFILE_URL: string | undefined = undefined;
 
 export const REELS: readonly Reel[] = [];
+
+/** Number of placeholder cards shown while no real Reels are configured. */
+export const REEL_PLACEHOLDER_COUNT = 8;

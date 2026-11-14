@@ -4,12 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { InstagramGlyph } from "./InstagramGlyph";
 
 export interface ResolvedReel {
   id: string;
   title: string;
-  instagramUrl: string;
+  /** Reel permalink. Absent for placeholders. */
+  instagramUrl?: string;
+  /** True for "coming soon" cards: decorative, not focusable, no actions. */
+  placeholder?: boolean;
   thumbnail?: { src: string; alt: string };
   /** Shop Now (product) or Explore Collection; absent when no confirmed page exists. */
   cta?: { kind: "shop" | "collection"; href: string; label: string };
@@ -17,43 +19,59 @@ export interface ResolvedReel {
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold";
 
+/** Thumbnail (or neutral placeholder) with the play icon. */
+function ReelMedia({ reel }: { reel: ResolvedReel }) {
+  return (
+    <>
+      {reel.thumbnail ? (
+        <Image
+          src={reel.thumbnail.src}
+          alt={reel.thumbnail.alt}
+          fill
+          sizes="(min-width: 1024px) 180px, (min-width: 640px) 170px, 45vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(110%_80%_at_50%_35%,var(--brand-ivory)_0%,var(--brand-cream)_70%,#eadfcd_100%)]"
+        >
+          <span className="absolute inset-2.5 rounded-xl border border-brand-gold/30" />
+        </span>
+      )}
+      {reel.thumbnail ? (
+        <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+      ) : null}
+      <span
+        aria-hidden="true"
+        className={`absolute top-1/2 left-1/2 inline-flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-white ring-2 ring-white/90 backdrop-blur-[2px] transition-transform duration-300 group-hover:scale-110 ${
+          reel.thumbnail ? "bg-black/25" : "bg-brand-gold/45 shadow-[0_6px_16px_-8px_rgba(120,92,40,0.6)]"
+        }`}
+      >
+        <Play className="ml-0.5 size-5 fill-white" strokeWidth={1.5} />
+      </span>
+    </>
+  );
+}
+
 function ReelCard({ reel, reserveCta }: { reel: ResolvedReel; reserveCta: boolean }) {
   return (
     <div className="flex h-full flex-col">
-      <a
-        href={reel.instagramUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`Watch reel on Instagram: ${reel.title} (opens in a new tab)`}
-        className={`group relative block aspect-[9/16] overflow-hidden rounded-2xl bg-brand-cream shadow-[0_14px_28px_-16px_rgba(60,45,20,0.45)] ring-1 ring-brand-gold/25 ${FOCUS}`}
-      >
-        {reel.thumbnail ? (
-          <Image
-            src={reel.thumbnail.src}
-            alt={reel.thumbnail.alt}
-            fill
-            sizes="(min-width: 1024px) 180px, (min-width: 640px) 170px, 45vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-          />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(110%_80%_at_50%_35%,var(--brand-ivory)_0%,var(--brand-cream)_70%,#eadfcd_100%)]"
-          >
-            <span className="absolute inset-2.5 rounded-xl border border-brand-gold/30" />
-            <InstagramGlyph mono className="size-8 text-brand-gold/55" />
-          </span>
-        )}
-        {reel.thumbnail ? (
-          <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-        ) : null}
-        <span
-          aria-hidden="true"
-          className="absolute top-1/2 left-1/2 inline-flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-white ring-2 ring-white/90 backdrop-blur-[2px] transition-transform duration-300 group-hover:scale-110"
+      {reel.instagramUrl && !reel.placeholder ? (
+        <a
+          href={reel.instagramUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Watch reel on Instagram: ${reel.title} (opens in a new tab)`}
+          className={`group relative block aspect-[9/16] overflow-hidden rounded-2xl bg-brand-cream shadow-[0_14px_28px_-16px_rgba(60,45,20,0.45)] ring-1 ring-brand-gold/25 ${FOCUS}`}
         >
-          <Play className="ml-0.5 size-5 fill-white" strokeWidth={1.5} />
-        </span>
-      </a>
+          <ReelMedia reel={reel} />
+        </a>
+      ) : (
+        <div aria-hidden="true" data-reel-placeholder className="group relative block aspect-[9/16] overflow-hidden rounded-2xl bg-brand-cream shadow-[0_14px_28px_-16px_rgba(60,45,20,0.45)] ring-1 ring-brand-gold/25">
+          <ReelMedia reel={reel} />
+        </div>
+      )}
 
       {reel.cta ? (
         <Link
@@ -119,7 +137,7 @@ export function ReelsCarousel({ reels }: { reels: readonly ResolvedReel[] }) {
   };
 
   const arrow =
-    "absolute top-[38%] z-10 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full border border-brand-gold/60 bg-white text-brand-black shadow-[0_6px_18px_-6px_rgba(23,23,23,0.25)] transition-[opacity,background-color] hover:bg-brand-ivory disabled:pointer-events-none disabled:opacity-35 sm:inline-flex sm:size-12 " +
+    "absolute top-[38%] z-10 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full border border-brand-gold/60 bg-white text-brand-black shadow-[0_6px_18px_-6px_rgba(23,23,23,0.25)] transition-[opacity,background-color] hover:bg-brand-ivory disabled:pointer-events-none disabled:opacity-35 sm:size-12 " +
     FOCUS;
 
   return (
@@ -140,10 +158,10 @@ export function ReelsCarousel({ reels }: { reels: readonly ResolvedReel[] }) {
         ))}
       </ul>
 
-      <button type="button" onClick={() => step(-1)} disabled={!canPrev} aria-label="Previous reels" className={`${arrow} left-0`}>
+      <button type="button" onClick={() => step(-1)} disabled={!canPrev} aria-label="Previous reels" className={`${arrow} -left-2 sm:left-0`}>
         <ChevronLeft aria-hidden="true" className="size-5" strokeWidth={2} />
       </button>
-      <button type="button" onClick={() => step(1)} disabled={!canNext} aria-label="Next reels" className={`${arrow} right-0`}>
+      <button type="button" onClick={() => step(1)} disabled={!canNext} aria-label="Next reels" className={`${arrow} -right-2 sm:right-0`}>
         <ChevronRight aria-hidden="true" className="size-5" strokeWidth={2} />
       </button>
 

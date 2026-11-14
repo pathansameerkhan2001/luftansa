@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { Pause, Play } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
-import { HeroFlourish } from "./HeroFlourish";
 
 export interface ResolvedHeroImage {
   src: string;
@@ -24,10 +23,9 @@ const getReducedMotion = () => window.matchMedia(reducedMotionQuery).matches;
 const getReducedMotionServer = () => true;
 
 /**
- * Image-only hero: crossfading slides (when more than one is configured) with
- * the hummingbird + flower flourish, which replays on every slide change.
+ * Image-only hero: crossfading slides when more than one is configured.
  */
-export function HeroStage({ slides, logoSrc }: { slides: readonly ResolvedHeroImage[]; logoSrc: string }) {
+export function HeroStage({ slides }: { slides: readonly ResolvedHeroImage[] }) {
   const count = slides.length;
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -75,14 +73,6 @@ export function HeroStage({ slides, logoSrc }: { slides: readonly ResolvedHeroIm
             />
           </div>
         ))}
-
-        {/* Keyed by slide: remounting replays the flourish with that slide's variant. */}
-        <HeroFlourish
-          key={active}
-          logoSrc={logoSrc}
-          variant={active}
-          className="bottom-[6%] left-[5%] w-[clamp(118px,19vw,300px)] lg:bottom-[8%] lg:left-[6%]"
-        />
 
         {count > 1 ? (
           <button
