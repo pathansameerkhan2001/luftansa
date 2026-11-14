@@ -15,15 +15,17 @@ export class AuditService {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async record(input: AuditInput): Promise<AuditEntry> {
+  buildEntry(input: AuditInput): AuditEntry {
     const data = auditInputSchema.parse({ ...input, summary: input.summary.slice(0, 500) });
     const at = this.now();
     const key = keys.audit(at, randomUUID().replace(/-/g, ""));
     const ts = at.toISOString();
-    return this.repo.create(
-      { ...key, ...data, entityType: ENTITY.audit, createdAt: ts, updatedAt: ts, version: 1 },
-      auditEntrySchema,
-    );
+    return { ...key, ...data, entityType: ENTITY.audit, createdAt: ts, updatedAt: ts, version: 1 };
+  }
+
+  async record(input: AuditInput): Promise<AuditEntry> {
+    const entry = this.buildEntry(input);
+    return this.repo.create(entry, auditEntrySchema);
   }
 
   /** Most recent entries (current month first, then the previous month). */

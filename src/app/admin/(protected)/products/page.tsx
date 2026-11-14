@@ -1,21 +1,33 @@
 import type { Metadata } from "next";
-import { AdminPlaceholder } from "@/components/admin/AdminPlaceholder";
 import { requireAdminPage } from "@/lib/auth/require-admin";
+import { getDataServices } from "@/lib/db/client";
+import { listProducts } from "@/lib/db/products-service";
+import { ProductManager } from "@/components/admin/ProductManager";
+import type { ProductItem } from "@/lib/db/schemas";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Products" };
-
-const CAPABILITIES = [
-  "Add, edit and delete products",
-  "Names, descriptions, fragrance categories and notes",
-  "Bottle types and available sizes",
-  "Size-based prices, MRP and configured discounts",
-  "Product images from the media library",
-  "Status, featured and bestseller flags",
-  "SEO title and description",
-] as const;
+export const metadata: Metadata = { title: "Products - Admin" };
 
 export default async function AdminProductsPage() {
   await requireAdminPage();
-  return <AdminPlaceholder title="Products" description="Fragrances, sizes, prices, images and SEO." phase={2} capabilities={CAPABILITIES} />;
+
+  const data = getDataServices();
+  let initialProducts: ProductItem[] = [];
+
+  if (data) {
+    try {
+      const res = await listProducts(data.repo, { limit: 100 });
+      initialProducts = res.items;
+    } catch {
+      // If table is newly provisioned or during build/local mode, fallback to empty list
+      initialProducts = [];
+    }
+  }
+
+  return (
+    <ProductManager
+      initialProducts={initialProducts}
+      dbConfigured={Boolean(data)}
+    />
+  );
 }

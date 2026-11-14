@@ -10,8 +10,8 @@ export interface DbConfig {
 }
 
 export function getDbConfig(): DbConfig | null {
-  const tableName = process.env.DYNAMODB_TABLE?.trim();
-  const region = (process.env.DYNAMODB_REGION ?? process.env.AWS_REGION)?.trim();
+  const tableName = (process.env.DYNAMODB_TABLE ?? "luftansa-store")?.trim();
+  const region = (process.env.DYNAMODB_REGION ?? process.env.AWS_REGION ?? "ap-south-2")?.trim();
   if (!tableName || !region) return null;
   if (!/^[A-Za-z0-9_.-]{3,255}$/.test(tableName)) return null;
   return { tableName, region };

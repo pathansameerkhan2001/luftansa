@@ -51,6 +51,8 @@ const iso = (d: Date) => d.toISOString();
 
 export const keys = {
   product: (id: string): ItemKey => ({ pk: `PRODUCT#${assertId(id)}`, sk: "META" }),
+  productGsi1: (status: string, id: string) => ({ GSI1PK: "PRODUCTS" as const, GSI1SK: `STATUS#${status}#SLUG#${assertId(id)}` }),
+  productGsi2: (category: string, id: string) => ({ GSI2PK: `CATEGORY#${category}`, GSI2SK: `SLUG#${assertId(id)}` }),
   variant: (productId: string, sizeMl: number): ItemKey => {
     if (!Number.isInteger(sizeMl) || sizeMl <= 0 || sizeMl > 10000) throw new InvalidKeyError("Invalid size");
     return { pk: `PRODUCT#${assertId(productId)}`, sk: `VARIANT#${String(sizeMl).padStart(5, "0")}` };
