@@ -2,8 +2,9 @@ import { getAssetUrl } from "@/lib/assets";
 import {
   getProductsBySlugs,
   PERSONALITY_COLLECTION_SLUGS,
-  priceForSize,
   ROLL_ON_PRODUCTS,
+  rollOnOptions,
+  sprayOptions,
   type Product,
   type RollOnProduct,
 } from "@/data/products";
@@ -11,20 +12,25 @@ import { CollectionPanel } from "./CollectionPanel";
 import { RollOnBottleIcon } from "./icons";
 import type { ProductCardData } from "./ProductCard";
 
-/** Spray perfumes: confirmed sizes priced from the standard price list. */
-export function toSprayCardData({ image, sizes, ...p }: Product): ProductCardData {
+/** Spray perfumes: confirmed sizes priced from the standard price list (+ configured MRP/offers). */
+export function toSprayCardData(product: Product): ProductCardData {
+  const { slug, name, description, image } = product;
   return {
-    ...p,
-    options: sizes.map((ml) => ({ id: `${ml}ml`, label: `${ml} ml`, priceInr: priceForSize(ml) })),
+    slug,
+    name,
+    description,
+    options: sprayOptions(product),
     image: image ? { src: getAssetUrl(image.key), alt: image.alt, objectPosition: image.objectPosition } : undefined,
   };
 }
 
 /** Roll-ons: each variant carries its own confirmed price (never the spray price list). */
-function toRollOnCardData({ image, variants, ...p }: RollOnProduct): ProductCardData {
+function toRollOnCardData(product: RollOnProduct): ProductCardData {
+  const { slug, name, image } = product;
   return {
-    ...p,
-    options: variants.map((v) => ({ id: v.label, label: v.label, priceInr: v.priceInr })),
+    slug,
+    name,
+    options: rollOnOptions(product),
     image: image ? { src: getAssetUrl(image.key), alt: image.alt, objectPosition: image.objectPosition } : undefined,
   };
 }

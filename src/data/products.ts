@@ -7,6 +7,13 @@
  * - Prices are NOT stored per product: they come from STANDARD_PRICES_INR for
  *   each confirmed size. Only list sizes that are confirmed for that product.
  * - `description` is optional; the card omits the line when it is absent.
+ * - Promotional fields (`mrpInr`, `offers`) and product facts (`concentration`,
+ *   `gender`) are optional and must only be set when explicitly confirmed by
+ *   Luftansa. The UI shows nothing for them while they are unset. Example:
+ *     mrpInr: { 100: <confirmed MRP> },
+ *     offers: [{ label: "Buy 1 Get 1 Free", sizes: [50, 100] }],
+ *     concentration: "<confirmed oil concentration>",
+ *     gender: "Unisex",
  * - `image` is optional; until genuine photography is uploaded to S3 the card
  *   shows a neutral placeholder. Set e.g.
  *     image: { key: "products/black-velvet.jpg", alt: "Luftansa Black Velvet bottle" }
@@ -29,6 +36,13 @@ export interface ProductImage {
   objectPosition?: string;
 }
 
+/** A confirmed promotional offer. Omit `sizes` when it applies to every size. */
+export interface ProductOffer {
+  /** Short badge text, e.g. "Buy 1 Get 1 Free". */
+  label: string;
+  sizes?: readonly BottleSizeMl[];
+}
+
 export interface Product {
   slug: string;
   name: string;
@@ -36,6 +50,14 @@ export interface Product {
   /** Confirmed bottle sizes for this product, in display order. */
   sizes: readonly BottleSizeMl[];
   image?: ProductImage;
+  /** Confirmed MRP per size. Shown struck through only when above the selling price. */
+  mrpInr?: Partial<Record<BottleSizeMl, number>>;
+  /** Confirmed promotional offers. */
+  offers?: readonly ProductOffer[];
+  /** Confirmed oil concentration, e.g. as printed on the label. */
+  concentration?: string;
+  /** Confirmed gender positioning, e.g. "Unisex". */
+  gender?: string;
 }
 
 export const PRODUCTS: readonly Product[] = [
@@ -88,6 +110,10 @@ export interface RollOnVariant {
   label: string;
   /** Confirmed price in INR for this variant. */
   priceInr: number;
+  /** Confirmed MRP, if any. */
+  mrpInr?: number;
+  /** Confirmed offer labels for this variant, if any. */
+  offers?: readonly string[];
 }
 
 export interface RollOnProduct {
@@ -107,6 +133,57 @@ export function getProductsBySlugs(slugs: readonly string[]): Product[] {
 
 export function priceForSize(size: BottleSizeMl): number {
   return STANDARD_PRICES_INR[size];
+}
+
+/** A purchasable option (bottle size / roll-on variant) with its confirmed pricing. */
+export interface ProductOption {
+  id: string;
+  label: string;
+  priceInr: number;
+  /** Confirmed MRP, only when higher than `priceInr`. */
+  mrpInr?: number;
+  /** Labels of confirmed offers that apply to this option. */
+  offers?: readonly string[];
+}
+
+function offersFor(offers: readonly ProductOffer[] | undefined, size?: BottleSizeMl): string[] | undefined {
+  const labels = (offers ?? []).filter((o) => !o.sizes || (size !== undefined && o.sizes.includes(size))).map((o) => o.label);
+  return labels.length > 0 ? labels : undefined;
+}
+
+function validMrp(mrp: number | undefined, price: number): number | undefined {
+  return mrp !== undefined && mrp > price ? mrp : undefined;
+}
+
+/** Spray options: confirmed sizes at standard prices, plus any configured MRP/offers. */
+export function sprayOptions(product: Product): ProductOption[] {
+  return product.sizes.map((ml) => {
+    const priceInr = priceForSize(ml);
+    return {
+      id: `${ml}ml`,
+      label: `${ml} ml`,
+      priceInr,
+      mrpInr: validMrp(product.mrpInr?.[ml], priceInr),
+      offers: offersFor(product.offers, ml),
+    };
+  });
+}
+
+/** Roll-on options: each variant's own confirmed price (never the spray list). */
+export function rollOnOptions(product: RollOnProduct): ProductOption[] {
+  return product.variants.map((v) => ({
+    id: v.label,
+    label: v.label,
+    priceInr: v.priceInr,
+    mrpInr: validMrp(v.mrpInr, v.priceInr),
+    offers: v.offers && v.offers.length > 0 ? v.offers : undefined,
+  }));
+}
+
+/** Whole-number discount percentage, or undefined when there is no valid MRP. */
+export function discountPercent(option: Pick<ProductOption, "priceInr" | "mrpInr">): number | undefined {
+  if (!option.mrpInr || option.mrpInr <= option.priceInr) return undefined;
+  return Math.round(((option.mrpInr - option.priceInr) / option.mrpInr) * 100);
 }
 
 const inr = new Intl.NumberFormat("en-IN", {

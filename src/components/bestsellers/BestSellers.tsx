@@ -2,7 +2,7 @@ import Image from "next/image";
 import { FlourishIcon } from "@/components/collection/icons";
 import { HERO_BANNER } from "@/components/hero/hero-banner";
 import { getAssetUrl } from "@/lib/assets";
-import { BEST_SELLER_SLUGS, getProductsBySlugs, priceForSize } from "@/data/products";
+import { BEST_SELLER_SLUGS, getProductsBySlugs, sprayOptions } from "@/data/products";
 import { FRAGRANCE_PROFILES, getNoteImage, type NoteTier } from "@/data/fragrance-profiles";
 import { BestSellersShowcase, type BestSellerItem } from "./BestSellersShowcase";
 
@@ -14,8 +14,10 @@ function buildItems(): BestSellerItem[] {
     return {
       slug: product.slug,
       name: product.name,
-      // Spray perfumes: confirmed sizes at the standard price list.
-      options: product.sizes.map((ml) => ({ id: `${ml}ml`, label: `${ml} ml`, priceInr: priceForSize(ml) })),
+      // Spray perfumes: confirmed sizes at the standard price list (+ configured MRP/offers).
+      options: sprayOptions(product),
+      concentration: product.concentration,
+      gender: product.gender,
       image: product.image
         ? { src: getAssetUrl(product.image.key), alt: product.image.alt, objectPosition: product.image.objectPosition }
         : undefined,

@@ -1,20 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { Heart, ShoppingCart } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
-import { formatInr } from "@/data/products";
+import { AddToCartButton, PricePanel, SizePills } from "@/components/pricing/PurchaseControls";
+import { formatInr, type ProductOption } from "@/data/products";
+import { dispatchAddToCart, dispatchWishlist } from "@/lib/cart-events";
 import { RollOnBottleIcon } from "./icons";
 
+export type { ProductOption } from "@/data/products";
 export type PlaceholderKind = "spray" | "roll-on";
-
-/** One purchasable option (a bottle size or roll-on variant) with its confirmed price. */
-export interface ProductOption {
-  id: string;
-  label: string;
-  priceInr: number;
-}
 
 export interface ProductCardData {
   slug: string;
@@ -28,17 +23,27 @@ interface ProductCardProps {
   product: ProductCardData;
   /** Which line icon the neutral placeholder shows when no photograph exists. */
   placeholder?: PlaceholderKind;
-  /** Wire to the cart once it exists. */
-  onAddToCart?: (slug: string, optionId: string) => void;
 }
 
-export function ProductCard({ product, placeholder = "spray", onAddToCart }: ProductCardProps) {
+export function ProductCard({ product, placeholder = "spray" }: ProductCardProps) {
   const { slug, name, description, options, image } = product;
   const [optionId, setOptionId] = useState<string | undefined>(options[0]?.id);
   const [wishlisted, setWishlisted] = useState(false);
-  const optionGroupId = useId();
+  const [status, setStatus] = useState("");
   const selected = options.find((o) => o.id === optionId);
   const PlaceholderIcon = placeholder === "roll-on" ? RollOnBottleIcon : PerfumeBottleIcon;
+
+  const addToCart = () => {
+    if (!selected) return;
+    dispatchAddToCart({ slug, name, optionId: selected.id, optionLabel: selected.label, priceInr: selected.priceInr });
+    setStatus("Online ordering is coming soon.");
+  };
+
+  const toggleWishlist = () => {
+    const next = !wishlisted;
+    setWishlisted(next);
+    dispatchWishlist({ slug, name, wishlisted: next });
+  };
 
   return (
     <article className="flex h-full flex-col rounded-[22px] bg-white/80 p-2.5 shadow-[0_1px_2px_rgba(23,23,23,0.04),0_14px_30px_-14px_rgba(23,23,23,0.18)] ring-1 ring-brand-gold/15 sm:p-3">
@@ -78,64 +83,31 @@ export function ProductCard({ product, placeholder = "spray", onAddToCart }: Pro
 
         {selected ? (
           <>
-            <fieldset className="mt-3.5">
-              <legend id={optionGroupId} className="sr-only">
-                Choose a size for {name}
-              </legend>
-              <div className="flex flex-wrap gap-1.5 sm:gap-2" role="radiogroup" aria-labelledby={optionGroupId}>
-                {options.map((option) => {
-                  const isSelected = option.id === selected.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      onClick={() => setOptionId(option.id)}
-                      className={`h-9 min-w-[54px] rounded-full border px-2.5 text-[13px] whitespace-nowrap tracking-[0.02em] transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold sm:min-w-[64px] sm:px-3.5 ${
-                        isSelected
-                          ? "border-brand-black bg-brand-black text-white"
-                          : "border-brand-gold/45 bg-white/60 text-brand-text hover:border-brand-gold"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
-
-            <div className="mt-auto flex items-center justify-between gap-3 pt-4">
-              <p
-                className="font-serif lining-nums text-[28px] leading-none font-semibold text-brand-black"
-                aria-live="polite"
-              >
-                {formatInr(selected.priceInr)}
-                <span className="sr-only"> for {selected.label}</span>
-              </p>
-              <button
-                type="button"
-                onClick={() => setWishlisted((w) => !w)}
-                aria-pressed={wishlisted}
-                aria-label={wishlisted ? `Remove ${name} from wishlist` : `Add ${name} to wishlist`}
-                className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-brand-gold/70 bg-white/70 text-brand-black transition-colors duration-200 hover:bg-brand-gold/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold"
-              >
-                <Heart
-                  aria-hidden="true"
-                  className={`size-[21px] transition-colors ${wishlisted ? "fill-brand-gold text-brand-gold" : ""}`}
-                  strokeWidth={1.5}
-                />
-              </button>
+            <div className="mt-3.5">
+              <SizePills
+                options={options}
+                selectedId={selected.id}
+                onSelect={(id) => {
+                  setOptionId(id);
+                  setStatus("");
+                }}
+                label={`Choose a size for ${name}`}
+              />
             </div>
 
-            <button
-              type="button"
-              onClick={() => onAddToCart?.(slug, selected.id)}
-              className="mt-4 inline-flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-brand-black text-[15px] font-medium tracking-[0.02em] text-white transition-colors duration-200 hover:bg-brand-text focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-gold"
-            >
-              <ShoppingCart aria-hidden="true" className="size-5" strokeWidth={1.5} />
-              Add to Cart
-            </button>
+            <div className="mt-auto pt-4">
+              <PricePanel option={selected} productName={name} wishlisted={wishlisted} onWishlist={toggleWishlist} />
+            </div>
+
+            <div className="mt-3">
+              <AddToCartButton
+                onClick={addToCart}
+                srDetail={`${name}, ${selected.label}, ${formatInr(selected.priceInr)}`}
+              />
+            </div>
+            <p role="status" className="mt-2 min-h-[1rem] text-center text-[12px] text-brand-text/65">
+              {status}
+            </p>
           </>
         ) : (
           <p className="mt-auto pt-5 text-[13px] text-brand-text/60">Sizes &amp; pricing coming soon</p>
