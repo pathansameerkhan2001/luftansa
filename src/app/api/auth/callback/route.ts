@@ -1,6 +1,6 @@
 import type { JWTPayload } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
-import { adminEmailOf, AuthError, exchangeCode, verifyIdToken } from "@/lib/auth/cognito";
+import { AuthError, checkAdmin, exchangeCode, verifyIdToken } from "@/lib/auth/cognito";
 import { AuthConfigError, getAuthConfig } from "@/lib/auth/config";
 import { clearCookie, cookieNames, cookieOptions } from "@/lib/auth/cookies";
 import { safeEqual, unseal } from "@/lib/auth/crypto";
@@ -25,8 +25,12 @@ interface LoginTransaction extends JWTPayload {
  * session. Any failure clears the transaction and returns to /admin/login.
  */
 export async function GET(request: NextRequest) {
-  const fail = (code: string, names?: ReturnType<typeof cookieNames>) => {
-    const res = NextResponse.redirect(new URL(`/admin/login?error=${code}`, request.url), { headers: { "Cache-Control": "no-store" } });
+  const fail = (code: string, names?: ReturnType<typeof cookieNames>, reason?: string) => {
+    const target = new URL("/admin/login", request.url);
+    target.searchParams.set("error", code);
+    // Safe diagnostic code only (never tokens, emails or configuration values).
+    if (reason) target.searchParams.set("reason", reason);
+    const res = NextResponse.redirect(target, { headers: { "Cache-Control": "no-store" } });
     if (names && config) {
       clearCookie(res.cookies, config, names.transaction);
       clearCookie(res.cookies, config, names.session);
@@ -57,7 +61,16 @@ export async function GET(request: NextRequest) {
     const tokens = await exchangeCode(config, code, tx.cv);
     if (!tokens.id_token) throw new AuthError("invalid_token");
     const claims = await verifyIdToken(config, tokens.id_token, tx.nonce);
-    if (!adminEmailOf(config, claims)) return fail("not_authorized", names);
+    const admin = checkAdmin(config, claims);
+    if (!admin.ok) {
+      console.warn(
+        `[auth] admin check failed: reason=${admin.reason}` +
+          (admin.maskedEmail ? ` email=${admin.maskedEmail}` : "") +
+          ` email_verified_claim=${typeof claims.email_verified === "undefined" ? "absent" : String(claims.email_verified)}` +
+          ` allowlist_size=${config.adminEmails.length}`,
+      );
+      return fail("not_authorized", names, admin.reason);
+    }
 
     const response = NextResponse.redirect(new URL(safeReturnTo(tx.rt), request.url), { headers: { "Cache-Control": "no-store" } });
     clearCookie(response.cookies, config, names.transaction);
@@ -69,6 +82,6 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     const code = e instanceof AuthError ? e.code : "callback_failed";
     console.warn(`[auth] callback rejected: ${code}`);
-    return fail(code === "invalid_nonce" ? "invalid_state" : code === "invalid_grant" ? "expired_code" : "login_failed", names);
+    return fail(code === "invalid_nonce" ? "invalid_state" : code === "invalid_grant" ? "expired_code" : "login_failed", names, code);
   }
 }

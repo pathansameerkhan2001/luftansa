@@ -16,12 +16,24 @@ const ERRORS: Record<string, string> = {
   config: "Admin sign-in is not configured yet.",
 };
 
+/** Diagnostic detail for a refused sign-in. Describes the signed-in user's OWN account only. */
+const REASONS: Record<string, string> = {
+  email_unverified:
+    "Your email address is not verified in Amazon Cognito. Ask the site owner to verify it (Cognito > Users > Edit user > mark email as verified), then sign in again.",
+  email_missing: "Your Cognito account did not provide an email address. The app client must be allowed to read the email attribute.",
+  email_not_allowed: "Your email is verified, but it is not on the administrator list (ADMIN_EMAILS).",
+};
+
+/** Codes that are safe to echo back (anything else is ignored). */
+const SAFE_CODE = /^[a-z_]{1,40}$/;
+
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; returnTo?: string }>;
+  searchParams: Promise<{ error?: string; reason?: string; returnTo?: string }>;
 }) {
-  const { error, returnTo } = await searchParams;
+  const { error, reason, returnTo } = await searchParams;
+  const reasonCode = reason && SAFE_CODE.test(reason) ? reason : undefined;
   const target = safeReturnTo(returnTo);
   if (await getAdminSession()) redirect(target);
 
@@ -41,9 +53,11 @@ export default async function AdminLoginPage({
         </p>
 
         {message ? (
-          <p role="alert" data-login-error={error} className="mt-5 rounded-xl border border-red-800/20 bg-red-50 px-4 py-3 text-[13.5px] text-red-900">
-            {message}
-          </p>
+          <div role="alert" data-login-error={error} data-login-reason={reasonCode} className="mt-5 rounded-xl border border-red-800/20 bg-red-50 px-4 py-3 text-left text-[13.5px] text-red-900">
+            <p>{message}</p>
+            {reasonCode && REASONS[reasonCode] ? <p className="mt-1.5 text-red-900/80">{REASONS[reasonCode]}</p> : null}
+            {reasonCode ? <p className="mt-1.5 font-mono text-[11.5px] text-red-900/60">Code: {error}/{reasonCode}</p> : null}
+          </div>
         ) : null}
 
         {/* Plain link (no prefetch): the login route sets one-time state cookies. */}

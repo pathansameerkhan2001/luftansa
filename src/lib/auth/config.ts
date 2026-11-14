@@ -1,3 +1,5 @@
+import { parseAdminEmails } from "./admin-emails";
+
 /**
  * Cognito authentication configuration, read exclusively from server
  * environment variables (never NEXT_PUBLIC_*). Shared by route handlers,
@@ -47,13 +49,17 @@ export function getAuthConfig(): AuthConfig {
   const redirectUri = required("AUTH_REDIRECT_URI");
   const logoutRedirectUri = required("AUTH_LOGOUT_REDIRECT_URI");
   const secret = required("AUTH_SECRET");
-  const adminEmails = required("ADMIN_EMAILS")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
+  // ADMIN_EMAILS is the documented name; ADMIN_EMAIL is accepted as a fallback.
+  const rawAdmins = process.env.ADMIN_EMAILS?.trim() || process.env.ADMIN_EMAIL?.trim();
+  if (!rawAdmins) throw new AuthConfigError("Missing environment variable ADMIN_EMAILS");
+  const { emails: adminEmails, invalidCount } = parseAdminEmails(rawAdmins);
+  if (invalidCount > 0) {
+    // Count only: the allow-list values are never logged.
+    console.warn(`[auth] ADMIN_EMAILS: ignored ${invalidCount} entr${invalidCount === 1 ? "y" : "ies"} that are not valid email addresses`);
+  }
 
   if (secret.length < 32) throw new AuthConfigError("AUTH_SECRET must be at least 32 characters");
-  if (adminEmails.length === 0) throw new AuthConfigError("ADMIN_EMAILS must list at least one email");
+  if (adminEmails.length === 0) throw new AuthConfigError("ADMIN_EMAILS must list at least one valid email");
   for (const [name, value] of [["COGNITO_DOMAIN", domain], ["AUTH_REDIRECT_URI", redirectUri], ["AUTH_LOGOUT_REDIRECT_URI", logoutRedirectUri]]) {
     const url = new URL(value);
     const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";

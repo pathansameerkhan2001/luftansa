@@ -5,6 +5,7 @@
  * Tokens are never logged; failures surface as AuthError codes only.
  */
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import { maskEmail, normalizeEmail } from "./admin-emails";
 import type { AuthConfig } from "./config";
 
 export class AuthError extends Error {
@@ -109,11 +110,29 @@ export async function verifyIdToken(config: AuthConfig, idToken: string, expecte
   return payload;
 }
 
-/** Administrator check: verified email that is on the ADMIN_EMAILS allow-list. */
-export function adminEmailOf(config: AuthConfig, claims: IdTokenClaims): string | null {
-  const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
+/** Why an otherwise valid ID token was refused admin access (safe to show / log). */
+export type AdminDenialReason = "email_missing" | "email_unverified" | "email_not_allowed";
+
+export type AdminCheck = { ok: true; email: string } | { ok: false; reason: AdminDenialReason; maskedEmail?: string };
+
+/**
+ * Administrator check. ALL conditions are required:
+ *  1. the ID token carries an email claim,
+ *  2. Cognito reports it verified (email_verified === true / "true"),
+ *  3. it matches an ADMIN_EMAILS entry (same normalisation on both sides).
+ */
+export function checkAdmin(config: AuthConfig, claims: IdTokenClaims): AdminCheck {
+  const email = typeof claims.email === "string" ? normalizeEmail(claims.email) : "";
+  if (!email) return { ok: false, reason: "email_missing" };
   const verified = claims.email_verified === true || claims.email_verified === "true";
-  return email && verified && config.adminEmails.includes(email) ? email : null;
+  if (!verified) return { ok: false, reason: "email_unverified", maskedEmail: maskEmail(email) };
+  if (!config.adminEmails.includes(email)) return { ok: false, reason: "email_not_allowed", maskedEmail: maskEmail(email) };
+  return { ok: true, email };
+}
+
+export function adminEmailOf(config: AuthConfig, claims: IdTokenClaims): string | null {
+  const result = checkAdmin(config, claims);
+  return result.ok ? result.email : null;
 }
 
 /** Cognito Managed Login logout URL (clears the Cognito session, then returns to the site). */
