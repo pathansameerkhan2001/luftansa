@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Heart, ShoppingBag, User, type LucideIcon } from "lucide-react";
+import { Heart, LayoutDashboard, ShoppingBag, User, type LucideIcon } from "lucide-react";
 import { UTILITY_LINKS } from "./nav-config";
 import { SearchToggle } from "./SearchToggle";
 
@@ -12,6 +12,20 @@ const LINKS: { label: string; href: string; Icon: LucideIcon; hideOnMobile?: boo
 export function UtilityNav() {
   return (
     <ul aria-label="Shop tools" className="-mr-2 flex items-center sm:gap-1">
+      {/* Admin dashboard: leftmost, so the existing icons keep their exact positions.
+          The destination is protected by administrator authentication. No prefetch,
+          so ordinary visitors never trigger admin requests. */}
+      <li>
+        <Link
+          href="/admin"
+          prefetch={false}
+          aria-label="Admin dashboard"
+          title="Admin dashboard"
+          className="inline-flex size-10 items-center justify-center text-brand-text transition-colors duration-200 hover:text-brand-gold focus-visible:outline-1 focus-visible:outline-brand-gold"
+        >
+          <LayoutDashboard aria-hidden="true" className="size-5" strokeWidth={1.5} />
+        </Link>
+      </li>
       {/* On lg+ the inline search field in the logo row replaces this icon. */}
       <li className="lg:hidden">
         <SearchToggle />

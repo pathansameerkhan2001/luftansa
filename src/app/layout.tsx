@@ -5,6 +5,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { SiteFooter } from "@/components/footer/SiteFooter";
 import { SiteHeader } from "@/components/header/SiteHeader";
+import { StorefrontChrome } from "@/components/layout/StorefrontChrome";
 
 // Geist + Geist Mono are self-hosted via Vercel's official `geist` package
 // (SIL OFL 1.1). They expose --font-geist-sans / --font-geist-mono.
@@ -41,11 +42,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${cormorant.variable} antialiased`}
       >
-        <SiteHeader />
+        {/* Storefront header/footer (unchanged); hidden only inside /admin, which has its own layout. */}
+        <StorefrontChrome>
+          <SiteHeader />
+        </StorefrontChrome>
         <div id="main-content" tabIndex={-1} className="outline-none">
           {children}
         </div>
-        <SiteFooter />
+        <StorefrontChrome>
+          <SiteFooter />
+        </StorefrontChrome>
       </body>
     </html>
   );
