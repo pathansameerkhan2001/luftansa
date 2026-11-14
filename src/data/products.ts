@@ -42,11 +42,26 @@ export const PRODUCTS: readonly Product[] = [
   { slug: "black-velvet", name: "Black Velvet", sizes: [30, 50, 100] },
   { slug: "downtown-tam", name: "Downtown Tam", sizes: [30, 50, 100] },
   { slug: "oud-forest", name: "Oud Forest", sizes: [30, 50, 100] },
+  // Best sellers ("Find Your Personality"). Spray perfumes at confirmed standard pricing.
+  { slug: "daily-rizz", name: "Daily Rizz", sizes: [30, 50, 100] },
+  { slug: "nonchalant", name: "Nonchalant", sizes: [30, 50, 100] },
+  { slug: "green-flag-energy", name: "Green Flag Energy", sizes: [30, 50, 100] },
+  { slug: "main-character", name: "Main Character", sizes: [30, 50, 100] },
+  { slug: "deja-vu", name: "Deja Vu", sizes: [30, 50, 100] },
   // Remaining signature fragrances (41 in total) to be added once confirmed.
 ];
 
 /** Products featured in the homepage "Signature Fragrances" section. */
 export const SIGNATURE_PRODUCT_SLUGS = ["black-velvet", "downtown-tam", "oud-forest"] as const;
+
+/** Homepage "Best Sellers / Find Your Personality" selector, in display order. */
+export const BEST_SELLER_SLUGS = [
+  "daily-rizz",
+  "nonchalant",
+  "green-flag-energy",
+  "main-character",
+  "deja-vu",
+] as const;
 
 /**
  * Personality Collection membership. Source: the approved homepage design,
