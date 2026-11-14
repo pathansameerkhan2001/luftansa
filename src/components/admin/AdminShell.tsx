@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ExternalLink, LogOut, Menu, X } from "lucide-react";
@@ -8,6 +9,55 @@ import { ADMIN_NAV, isActiveAdminPath } from "./admin-nav";
 
 const FOCUS_DARK = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c6a76a]";
 const FOCUS_LIGHT = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold";
+
+const WINDOW = { x: 175, y: 212, width: 903, height: 1074 } as const;
+const LOGO_DIMS = { width: 1183, height: 1600 } as const;
+const pct = (n: number) => `${(n * 100).toFixed(4)}%`;
+
+function Brand({ logoUrl = "/media/logo/logo.jpeg" }: { logoUrl?: string }) {
+  return (
+    <div className="flex items-center gap-3.5 px-5 py-5">
+      <Link
+        href="/admin"
+        aria-label="Luftansa Admin"
+        className="group relative flex shrink-0 items-center justify-center rounded-2xl bg-brand-ivory p-2 ring-1 ring-[#c6a76a]/60 shadow-[0_4px_14px_rgba(0,0,0,0.35)] transition-transform hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c6a76a]"
+      >
+        <span
+          className="relative block h-11 overflow-hidden"
+          style={{ aspectRatio: `${WINDOW.width} / ${WINDOW.height}` }}
+        >
+          <Image
+            src={logoUrl}
+            alt="Luftansa"
+            width={LOGO_DIMS.width}
+            height={LOGO_DIMS.height}
+            sizes="50px"
+            className="absolute mix-blend-multiply"
+            style={{
+              width: pct(LOGO_DIMS.width / WINDOW.width),
+              height: pct(LOGO_DIMS.height / WINDOW.height),
+              left: pct(-WINDOW.x / WINDOW.width),
+              top: pct(-WINDOW.y / WINDOW.height),
+              maxWidth: "none",
+            }}
+          />
+        </span>
+      </Link>
+      <div className="min-w-0 leading-tight">
+        <Link
+          href="/admin"
+          className="font-serif text-[21px] font-semibold tracking-[0.02em] text-white hover:text-[#e9d6ab] transition-colors"
+        >
+          Luftansa
+        </Link>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="inline-block size-1.5 rounded-full bg-[#c6a76a]" aria-hidden="true" />
+          <p className="text-[10px] font-semibold tracking-[0.24em] text-[#c6a76a] uppercase">Admin</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
@@ -21,14 +71,20 @@ function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: (
                 href={href}
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
-                className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] transition-colors ${FOCUS_DARK} ${
+                className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13.5px] transition-all duration-150 ${FOCUS_DARK} ${
                   active
-                    ? "bg-[#c6a76a]/15 font-semibold text-[#e9d6ab] shadow-[inset_2px_0_0_#c6a76a]"
-                    : "text-white/70 hover:bg-white/5 hover:text-white"
+                    ? "bg-gradient-to-r from-[#c6a76a]/20 to-[#c6a76a]/5 font-semibold text-[#f8f5ec] shadow-[inset_3px_0_0_#c6a76a] ring-1 ring-[#c6a76a]/30"
+                    : "text-white/65 hover:bg-white/[0.06] hover:text-white"
                 }`}
               >
-                <Icon aria-hidden="true" className={`size-[18px] shrink-0 ${active ? "text-[#c6a76a]" : "text-white/50 group-hover:text-white/80"}`} strokeWidth={1.6} />
-                {label}
+                <Icon
+                  aria-hidden="true"
+                  className={`size-[18px] shrink-0 transition-colors ${
+                    active ? "text-[#c6a76a]" : "text-white/45 group-hover:text-[#c6a76a]/90"
+                  }`}
+                  strokeWidth={1.6}
+                />
+                <span className="truncate">{label}</span>
               </Link>
             </li>
           );
@@ -38,22 +94,16 @@ function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: (
   );
 }
 
-function Brand() {
-  return (
-    <div className="flex items-center gap-3 px-5 py-5">
-      <span aria-hidden="true" className="inline-flex size-9 items-center justify-center rounded-full border border-[#c6a76a]/60 font-serif text-[18px] font-semibold text-[#e9d6ab]">
-        L
-      </span>
-      <div className="leading-tight">
-        <p className="font-serif text-[19px] font-semibold text-white">Luftansa</p>
-        <p className="text-[10.5px] font-semibold tracking-[0.24em] text-[#c6a76a] uppercase">Admin</p>
-      </div>
-    </div>
-  );
-}
-
 /** Admin layout: dark sidebar (drawer on mobile), top bar with profile + sign out, ivory workspace. */
-export function AdminShell({ email, children }: { email: string; children: ReactNode }) {
+export function AdminShell({
+  email,
+  logoUrl,
+  children,
+}: {
+  email: string;
+  logoUrl?: string;
+  children: ReactNode;
+}) {
   const pathname = usePathname() ?? "/admin";
   const [open, setOpen] = useState(false);
   const current = ADMIN_NAV.find((n) => isActiveAdminPath(pathname, n.href));
@@ -77,12 +127,15 @@ export function AdminShell({ email, children }: { email: string; children: React
     <div className="min-h-dvh bg-[#f6f2ea] text-brand-black lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:bg-[linear-gradient(to_right,#161513_260px,#f6f2ea_260px)]">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-black/40 bg-[#161513] lg:flex" data-admin-sidebar>
-        <Brand />
+        <Brand logoUrl={logoUrl} />
         <div className="mx-5 h-px bg-gradient-to-r from-[#c6a76a]/50 to-transparent" />
         <SidebarNav pathname={pathname} />
         <div className="border-t border-white/10 px-5 py-4">
-          <Link href="/" className={`inline-flex items-center gap-2 text-[12.5px] text-white/55 hover:text-[#e9d6ab] ${FOCUS_DARK}`}>
-            <ExternalLink aria-hidden="true" className="size-3.5" />
+          <Link
+            href="/"
+            className={`inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] font-medium text-white/55 transition-colors hover:bg-white/5 hover:text-[#e9d6ab] ${FOCUS_DARK}`}
+          >
+            <ExternalLink aria-hidden="true" className="size-3.5 text-[#c6a76a]" />
             View storefront
           </Link>
         </div>
@@ -94,16 +147,24 @@ export function AdminShell({ email, children }: { email: string; children: React
           <button type="button" aria-label="Close navigation" className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
           <aside className="relative flex h-full w-[min(280px,85vw)] flex-col bg-[#161513] shadow-2xl" data-admin-drawer>
             <div className="flex items-center justify-between pr-3">
-              <Brand />
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close navigation" className={`inline-flex size-10 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 ${FOCUS_DARK}`}>
+              <Brand logoUrl={logoUrl} />
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close navigation"
+                className={`inline-flex size-10 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 ${FOCUS_DARK}`}
+              >
                 <X aria-hidden="true" className="size-5" />
               </button>
             </div>
             <div className="mx-5 h-px bg-gradient-to-r from-[#c6a76a]/50 to-transparent" />
             <SidebarNav pathname={pathname} onNavigate={() => setOpen(false)} />
             <div className="border-t border-white/10 px-5 py-4">
-              <Link href="/" className={`inline-flex items-center gap-2 text-[12.5px] text-white/55 hover:text-[#e9d6ab] ${FOCUS_DARK}`}>
-                <ExternalLink aria-hidden="true" className="size-3.5" />
+              <Link
+                href="/"
+                className={`inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] font-medium text-white/55 transition-colors hover:bg-white/5 hover:text-[#e9d6ab] ${FOCUS_DARK}`}
+              >
+                <ExternalLink aria-hidden="true" className="size-3.5 text-[#c6a76a]" />
                 View storefront
               </Link>
             </div>
@@ -128,7 +189,7 @@ export function AdminShell({ email, children }: { email: string; children: React
           </div>
 
           <div className="flex items-center gap-3" data-admin-profile>
-            <span aria-hidden="true" className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#161513] text-[13px] font-semibold text-[#e9d6ab] ring-1 ring-[#c6a76a]/60">
+            <span aria-hidden="true" className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#161513] text-[13px] font-semibold text-[#e9d6ab] ring-1 ring-[#c6a76a]/60 shadow-sm">
               {initial}
             </span>
             <div className="hidden min-w-0 leading-tight sm:block">
@@ -140,7 +201,7 @@ export function AdminShell({ email, children }: { email: string; children: React
             <form action="/api/auth/logout" method="post">
               <button
                 type="submit"
-                className={`inline-flex h-9 items-center gap-2 rounded-lg border border-[#d9c79f] bg-white px-3 text-[13px] font-medium text-brand-black transition-colors hover:border-brand-black hover:bg-brand-black hover:text-white ${FOCUS_LIGHT}`}
+                className={`inline-flex h-9 items-center gap-2 rounded-xl border border-[#d9c79f] bg-white px-3 text-[13px] font-medium text-brand-black shadow-xs transition-colors hover:border-brand-black hover:bg-brand-black hover:text-white ${FOCUS_LIGHT}`}
               >
                 <LogOut aria-hidden="true" className="size-4" strokeWidth={1.75} />
                 <span className="hidden sm:inline">Sign out</span>
