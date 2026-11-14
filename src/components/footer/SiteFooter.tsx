@@ -70,7 +70,7 @@ const SERVICE: FooterLink[] = [
   { label: "Terms and Conditions" },
 ];
 
-const LINK = "text-[14px] text-white/60 transition-colors hover:text-brand-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold";
+const LINK = "text-[14px] text-brand-text/75 transition-colors hover:text-brand-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold";
 
 function LinkColumn({ title, links }: { title: string; links: FooterLink[] }) {
   return (
@@ -84,9 +84,9 @@ function LinkColumn({ title, links }: { title: string; links: FooterLink[] }) {
                 {l.label}
               </Link>
             ) : (
-              <span className="text-[14px] text-white/35" data-pending-link>
+              <span className="text-[14px] text-brand-text/45" data-pending-link>
                 {l.label}
-                <span className="ml-2 rounded-full border border-white/15 px-1.5 py-px text-[9.5px] tracking-[0.1em] text-white/40 uppercase">
+                <span className="ml-2 rounded-full border border-brand-gold/30 bg-brand-cream/60 px-1.5 py-px text-[9.5px] tracking-[0.1em] text-brand-text/60 uppercase">
                   Coming soon
                 </span>
               </span>
@@ -100,9 +100,9 @@ function LinkColumn({ title, links }: { title: string; links: FooterLink[] }) {
 
 function FooterHeading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="text-[15px] font-semibold tracking-[0.02em] text-white">
+    <h2 className="text-[15px] font-semibold tracking-[0.02em] text-brand-black">
       {children}
-      <span aria-hidden="true" className="mt-2 block h-px w-8 bg-brand-gold/70" />
+      <span aria-hidden="true" className="mt-2 block h-px w-8 bg-brand-gold" />
     </h2>
   );
 }
@@ -144,7 +144,7 @@ function SocialLinks() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`${i.label} (opens in a new tab)`}
-            className="inline-flex size-10 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/10 transition-colors hover:bg-brand-gold hover:text-brand-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold"
+            className="inline-flex size-10 items-center justify-center rounded-full bg-brand-cream text-brand-black ring-1 ring-brand-gold/35 transition-colors hover:bg-brand-gold hover:text-brand-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold"
           >
             {i.icon}
           </a>
@@ -160,15 +160,15 @@ export function SiteFooter() {
   const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CONTACT.addressLines.join(" "))}`;
 
   return (
-    <footer className="bg-[#1c1b19] text-white">
+    <footer className="border-t border-brand-gold/25 bg-white text-brand-black">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 pt-14 pb-10 sm:grid-cols-2 sm:px-8 sm:pt-16 lg:grid-cols-[1.5fr_1fr_1fr_0.9fr] lg:gap-12">
         <div id="footer-contact" className="scroll-mt-6 sm:col-span-2 lg:col-span-1">
           <FooterLogo />
-          <p className="mt-5 max-w-sm text-[14px] leading-relaxed text-white/60">
+          <p className="mt-5 max-w-sm text-[14px] leading-relaxed text-brand-text/75">
             Luftansa Fragrance Craft Hub brings together distinctive scents and thoughtful craftsmanship, created for every
             mood, moment and personality.
           </p>
-          <address className="mt-5 space-y-3 text-[14px] not-italic text-white/70">
+          <address className="mt-5 space-y-3 text-[14px] not-italic text-brand-text/80">
             <a href={mailHref} className={`flex items-start gap-3 break-all ${LINK}`}>
               <Mail aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-gold" strokeWidth={1.75} />
               <span>
@@ -180,7 +180,7 @@ export function SiteFooter() {
               <Phone aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-gold" strokeWidth={1.75} />
               <span>
                 <span className="sr-only">Phone and WhatsApp: </span>
-                {CONTACT.phone} <span className="text-white/40">(Phone / WhatsApp)</span>
+                {CONTACT.phone} <span className="text-brand-text/50">(Phone / WhatsApp)</span>
               </span>
             </a>
             <a href={mapsHref} target="_blank" rel="noopener noreferrer" className={`flex items-start gap-3 ${LINK}`}>
@@ -209,8 +209,8 @@ export function SiteFooter() {
         </div>
       </div>
 
-      <div className="border-t border-white/10">
-        <p className="mx-auto max-w-7xl px-4 py-5 text-center text-[12.5px] text-white/50 sm:px-8">
+      <div className="border-t border-brand-gold/20">
+        <p className="mx-auto max-w-7xl px-4 py-5 text-center text-[12.5px] text-brand-text/60 sm:px-8">
           © {STORE_NAME}. All rights reserved.
         </p>
       </div>

@@ -1,11 +1,10 @@
-import { AccountShell, ACCOUNT_SECTION_ICONS, AuthCard, ContactLinks, LockedPanel, SetupNotice } from "@/components/account/AccountUI";
-import { getCustomerAccountStatus, getCustomerSession } from "@/lib/customer/account";
+import { AccountShell, ACCOUNT_SECTION_ICONS, ContactLinks, LockedPanel, SetupNotice } from "@/components/account/AccountUI";
+import { getCustomerSession } from "@/lib/customer/account";
 
 export const dynamic = "force-dynamic";
 
-/** /account: customer sign-in, registration, profile and order overview. */
+/** /account: customer order and support concierge overview. */
 export default async function AccountPage() {
-  const status = getCustomerAccountStatus();
   const session = await getCustomerSession();
 
   if (session) {
@@ -33,12 +32,7 @@ export default async function AccountPage() {
   const { profile, orders, details } = ACCOUNT_SECTION_ICONS;
   return (
     <AccountShell title="My Account" current="overview" crumbs={[{ label: "My Account" }]}>
-      {status.authConfigured ? null : <SetupNotice />}
-
-      <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 lg:gap-7">
-        <AuthCard mode="signin" enabled={status.authConfigured} />
-        <AuthCard mode="register" enabled={status.authConfigured} />
-      </div>
+      <SetupNotice />
 
       <h2 className="mt-12 font-serif text-[26px] leading-tight font-semibold text-brand-black sm:text-[30px]">Your account</h2>
       <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

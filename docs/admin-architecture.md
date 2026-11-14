@@ -28,7 +28,7 @@ the storefront for search engines and no-JS clients. Restoring that requires eit
 | Writes | n/a | same-origin check (`Origin` must match, or `Sec-Fetch-Site: same-origin`), else `403` |
 
 - Admin identity = Cognito ID token + verified email on `ADMIN_EMAILS` (see `src/lib/auth`).
-- Customer accounts (`src/lib/customer`) never read admin cookies or admin configuration.
+- Customer login and registration are explicitly excluded: only administrator authentication is supported. No customer authentication flows, forms, or credentials exist.
 - Unknown `/admin/*` URLs require authentication, then show the admin 404.
 
 ## Data layer (server-only)

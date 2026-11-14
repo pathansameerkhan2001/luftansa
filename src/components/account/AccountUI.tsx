@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Info, LockKeyhole, Mail, MessageCircle, Package, Phone, ReceiptText, UserRound, type LucideIcon } from "lucide-react";
+import { Info, Mail, MessageCircle, Package, Phone, ReceiptText, UserRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { CONTACT, mailHref, telHref, whatsappHref } from "@/data/store";
 
@@ -77,16 +77,16 @@ export function AccountShell({
   );
 }
 
-/** Clear, non-alarming notice that customer accounts are not live yet. */
+/** Clear notice that customer accounts and registration are not required. */
 export function SetupNotice({ id = "account-setup-notice" }: { id?: string }) {
   return (
     <div id={id} role="status" data-account-setup className="flex gap-3 rounded-2xl border border-brand-gold/50 bg-brand-cream px-4 py-4 sm:px-5">
       <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-gold" strokeWidth={1.75} />
       <div className="text-[14px] leading-relaxed text-brand-text/85">
-        <p className="font-semibold text-brand-black">Customer accounts are being set up</p>
+        <p className="font-semibold text-brand-black">Customer concierge & direct support</p>
         <p className="mt-1">
-          Online sign-in and registration are not available yet, so no account can be created or accessed here at the
-          moment. For orders, order updates or any help, please contact us directly.
+          Customer account registration is not required to shop with Luftansa. For order updates, personal recommendations,
+          or any questions, our concierge team is directly available via WhatsApp, email, or phone.
         </p>
         <ContactLinks />
       </div>
@@ -120,61 +120,6 @@ export function ContactLinks() {
   );
 }
 
-const fieldClass =
-  "mt-1.5 h-11 w-full rounded-xl border border-brand-gold/40 bg-white px-3.5 text-[14.5px] text-brand-black placeholder:text-brand-text/40 disabled:cursor-not-allowed disabled:bg-brand-cream/60 disabled:text-brand-text/50";
-
-function Field({ id, label, type = "text", autoComplete }: { id: string; label: string; type?: string; autoComplete: string }) {
-  return (
-    <div>
-      <label htmlFor={id} className="text-[13px] font-medium text-brand-black">
-        {label}
-      </label>
-      <input id={id} name={id} type={type} autoComplete={autoComplete} disabled className={fieldClass} />
-    </div>
-  );
-}
-
-/**
- * Sign-in / registration form shells. While customer authentication is not
- * configured every control is disabled and points to the setup notice, so the
- * page never pretends that login or registration works.
- */
-export function AuthCard({ mode, enabled }: { mode: "signin" | "register"; enabled: boolean }) {
-  const signin = mode === "signin";
-  const p = signin ? "signin" : "register";
-  return (
-    <section
-      aria-labelledby={`${p}-heading`}
-      data-account-form={mode}
-      className="rounded-[22px] border border-brand-gold/35 bg-white/70 p-5 shadow-[0_18px_40px_-30px_rgba(60,45,20,0.45)] sm:p-7"
-    >
-      <h2 id={`${p}-heading`} className="font-serif text-[24px] leading-tight font-semibold text-brand-black sm:text-[26px]">
-        {signin ? "Sign in" : "Create an account"}
-      </h2>
-      <p className="mt-1.5 text-[13.5px] text-brand-text/70">
-        {signin ? "Access your profile and orders." : "Save your details and follow your orders."}
-      </p>
-      <form className="mt-5 space-y-4" aria-describedby="account-setup-notice" noValidate>
-        <fieldset disabled={!enabled} className="space-y-4">
-          <legend className="sr-only">{signin ? "Sign in details" : "Registration details"}</legend>
-          {signin ? null : <Field id={`${p}-name`} label="Full name" autoComplete="name" />}
-          <Field id={`${p}-email`} label="Email address" type="email" autoComplete="email" />
-          {signin ? null : <Field id={`${p}-phone`} label="Mobile number" type="tel" autoComplete="tel" />}
-          <Field id={`${p}-password`} label="Password" type="password" autoComplete={signin ? "current-password" : "new-password"} />
-          <button
-            type="submit"
-            disabled={!enabled}
-            className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-black text-[15px] font-semibold text-white transition-colors hover:bg-brand-text disabled:cursor-not-allowed disabled:bg-brand-black/35 ${FOCUS}`}
-          >
-            {enabled ? null : <LockKeyhole aria-hidden="true" className="size-4" strokeWidth={1.75} />}
-            {signin ? "Sign in" : "Create account"}
-          </button>
-        </fieldset>
-        {enabled ? null : <p className="text-center text-[12.5px] text-brand-text/60">Available once customer accounts open.</p>}
-      </form>
-    </section>
-  );
-}
 
 /** Locked account section (profile / order history / order details). */
 export function LockedPanel({
@@ -196,8 +141,7 @@ export function LockedPanel({
       <h2 className="mt-4 font-serif text-[22px] leading-tight font-semibold text-brand-black">{title}</h2>
       <p className="mt-1.5 text-[13.5px] leading-relaxed text-brand-text/75">{description}</p>
       <p className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-medium tracking-[0.06em] text-brand-text/55 uppercase">
-        <LockKeyhole aria-hidden="true" className="size-3.5" strokeWidth={1.75} />
-        Available after you sign in
+        Managed via concierge
       </p>
       {action ? (
         <Link
@@ -213,27 +157,21 @@ export function LockedPanel({
 
 export const ACCOUNT_SECTION_ICONS = { profile: UserRound, orders: Package, details: ReceiptText } as const;
 
-/** "Sign in required" body used by the order pages. */
+/** Order inquiry panel used by the order pages. */
 export function SignInRequired({ what }: { what: string }) {
   return (
     <div className="mx-auto max-w-2xl">
       <div data-sign-in-required className="rounded-[22px] border border-brand-gold/35 bg-white/70 p-6 text-center sm:p-9">
         <span className="mx-auto inline-flex size-12 items-center justify-center rounded-full border border-brand-gold/60 text-brand-black">
-          <LockKeyhole aria-hidden="true" className="size-5" strokeWidth={1.6} />
+          <Package aria-hidden="true" className="size-5 text-brand-gold" strokeWidth={1.6} />
         </span>
-        <h2 className="mt-4 font-serif text-[26px] leading-tight font-semibold text-brand-black">Sign in to view {what}</h2>
+        <h2 className="mt-4 font-serif text-[26px] leading-tight font-semibold text-brand-black">Assistance with {what}</h2>
         <p className="mt-2 text-[14px] leading-relaxed text-brand-text/75">
-          Your {what} will appear here once you are signed in to your Luftansa account.
+          Customer login is not required. For updates on your recent orders or help with {what}, please reach out to our team directly.
         </p>
-        <Link
-          href="/account"
-          className={`mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-brand-black px-6 text-[14px] font-semibold text-white transition-colors hover:bg-brand-text ${FOCUS}`}
-        >
-          Go to sign in
-        </Link>
-      </div>
-      <div className="mt-6">
-        <SetupNotice id="orders-setup-notice" />
+        <div className="mt-6 flex justify-center">
+          <ContactLinks />
+        </div>
       </div>
     </div>
   );

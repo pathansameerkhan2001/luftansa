@@ -1,20 +1,10 @@
 import "server-only";
 
 /**
- * Customer accounts: deliberately SEPARATE from the administrator Cognito
- * login (src/lib/auth). This module never reads admin cookies, admin env vars
- * or admin permissions, and admin sessions never grant customer access.
- *
- * Status today: no customer identity provider and no order database are
- * configured, so every account page renders an honest setup state.
- *
- * To enable later (both must be configured):
- *  - Customer sign-in: a SEPARATE identity store from the admin portal, e.g. a
- *    dedicated Cognito user pool + app client for customers. Set
- *    CUSTOMER_AUTH_PROVIDER and that provider's own env vars, never ADMIN_EMAILS
- *    or the admin client.
- *  - Orders: an order database / commerce backend. Set ORDERS_BACKEND.
- * Then implement getCustomerSession() and the order queries below.
+ * Customer accounts & authentication policy:
+ * Customer login and customer registration are NOT needed and not built.
+ * Only administrator authentication (src/lib/auth) is supported.
+ * No customer authentication flows, forms, or credentials exist.
  */
 
 export interface CustomerProfile {
@@ -29,15 +19,15 @@ export interface CustomerSession {
 }
 
 export interface CustomerAccountStatus {
-  /** A customer identity provider is configured. */
-  authConfigured: boolean;
+  /** Customer authentication is permanently disabled (admin auth only). */
+  authConfigured: false;
   /** An order database / commerce backend is configured. */
   ordersConfigured: boolean;
 }
 
 export function getCustomerAccountStatus(): CustomerAccountStatus {
   return {
-    authConfigured: Boolean(process.env.CUSTOMER_AUTH_PROVIDER?.trim()),
+    authConfigured: false,
     ordersConfigured: Boolean(process.env.ORDERS_BACKEND?.trim()),
   };
 }

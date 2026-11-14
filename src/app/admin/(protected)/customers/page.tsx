@@ -9,7 +9,6 @@ const CAPABILITIES = [
   "Customer listing",
   "Profile, email and contact details",
   "Customer order history",
-  "Account status (separate customer sign-in)",
 ] as const;
 
 export default async function AdminCustomersPage() {
