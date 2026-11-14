@@ -6,7 +6,7 @@ import { getAssetUrl } from "@/lib/assets";
 import { NOTE_CATEGORIES, type NoteCategory } from "@/data/note-categories";
 
 const BUTTON_CLASS =
-  "mt-5 inline-flex h-11 items-center justify-center gap-3 rounded-md border border-brand-gold px-5 text-[12px] font-semibold tracking-[0.16em] whitespace-nowrap text-brand-black uppercase sm:mt-6 sm:px-6";
+  "mt-5 inline-flex h-10 items-center justify-center gap-2.5 rounded-md border border-brand-gold px-5 text-[11.5px] font-semibold tracking-[0.15em] whitespace-nowrap text-brand-black uppercase sm:mt-6 sm:px-6";
 
 function NoteCard({ category }: { category: NoteCategory }) {
   const { label, title, description, image, href } = category;
@@ -33,7 +33,7 @@ function NoteCard({ category }: { category: NoteCategory }) {
           className="absolute inset-0 bg-[linear-gradient(160deg,rgba(23,17,8,0.62)_0%,rgba(23,17,8,0.28)_38%,rgba(23,17,8,0)_62%)]"
         />
         <p aria-hidden="true" className="absolute top-6 left-6 sm:top-7 sm:left-7">
-          <span className="block font-serif text-[30px] leading-[0.98] font-semibold tracking-[0.03em] text-white uppercase drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] sm:text-[34px]">
+          <span className="block font-serif text-[26px] leading-[0.98] font-semibold tracking-[0.03em] text-white uppercase drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] sm:text-[29px]">
             {labelFirst}
             <br />
             {labelRest.join(" ")}
@@ -43,8 +43,8 @@ function NoteCard({ category }: { category: NoteCategory }) {
       </div>
 
       <div className="flex flex-1 flex-col items-center px-5 pt-6 pb-7 text-center sm:pt-7 sm:pb-8">
-        <h3 className="font-serif text-[27px] leading-tight font-semibold text-brand-black sm:text-[29px]">{title}</h3>
-        <p className="mt-2 text-[14.5px] leading-relaxed text-pretty text-brand-text/80 sm:text-[15px]">{description}</p>
+        <h3 className="font-serif text-[23px] leading-tight font-semibold text-brand-black sm:text-[25px]">{title}</h3>
+        <p className="mt-1.5 text-[13.5px] leading-relaxed text-pretty text-brand-text/80 sm:text-[14px]">{description}</p>
         <div className="mt-auto">
           {href ? (
             <Link
@@ -83,16 +83,16 @@ export function ExploreByNotes({ categories = NOTE_CATEGORIES }: { categories?: 
             <FlourishIcon className="size-8 shrink-0 sm:size-9" />
             <span className="h-px w-16 bg-gradient-to-l from-transparent to-brand-gold/80 min-[400px]:w-24 sm:w-56" />
           </div>
-          <p className="mt-3 text-[11px] tracking-[0.38em] text-brand-black uppercase sm:text-[13px] sm:tracking-[0.42em]">
+          <p className="mt-3 text-[11px] tracking-[0.36em] text-brand-black uppercase sm:text-[12px] sm:tracking-[0.4em]">
             <span className="font-normal">Fragrance</span> <span className="font-semibold">Notes</span>
           </p>
           <h2
             id="explore-notes-heading"
-            className="mt-1 font-serif text-[46px] leading-[1.05] font-semibold italic tracking-[-0.01em] text-brand-black min-[400px]:text-[52px] sm:text-[68px] lg:text-[80px]"
+            className="mt-1 font-serif text-[38px] leading-[1.05] font-semibold italic tracking-[-0.01em] text-brand-black min-[400px]:text-[42px] sm:text-[54px] lg:text-[62px]"
           >
             Explore by Notes
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-pretty text-brand-text/80 sm:mt-4 sm:text-[18px]">
+          <p className="mx-auto mt-3 max-w-xl text-[14.5px] leading-relaxed text-pretty text-brand-text/80 sm:text-[16px]">
             Find your perfect fragrance from our curated note collections.
           </p>
         </header>

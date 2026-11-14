@@ -23,3 +23,11 @@ export const HERO_BANNER: HeroBannerConfig = {
   alt: "Soft folds of warm ivory silk forming an abstract, petal-like shape in gentle light",
   objectPosition: { base: "40% 50%", lg: "50% 50%" },
 };
+
+/**
+ * Hero slides, in order. Only one genuine image is configured today, so the
+ * hero is static and the flourish plays once. Add further slides (preferably
+ * S3 keys under "hero/") to enable the crossfading rotation; the flourish then
+ * replays with a different entrance on every slide change.
+ */
+export const HERO_SLIDES: readonly HeroBannerConfig[] = [HERO_BANNER];

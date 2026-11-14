@@ -1,0 +1,129 @@
+/*
+ * Hummingbird + flower flourish (decorative). Every element's resting style is
+ * its FINAL state, so reduced-motion users simply see the completed artwork.
+ * Timing variables are set per variant from HeroFlourish.tsx.
+ */
+
+/* Until the artwork has loaded, hold every animation on its first frame. */
+.waiting,
+.waiting * {
+  animation-play-state: paused !important;
+}
+
+.halo {
+  opacity: 0.55;
+  animation: halo-in 1.8s cubic-bezier(0.22, 0.8, 0.3, 1) var(--bloom-delay) both;
+}
+
+.ring {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: ring-draw 2.2s cubic-bezier(0.45, 0, 0.2, 1) calc(var(--bloom-delay) + 0.2s) both;
+}
+
+/* Flowers: gentle bloom, then a slow sway pivoting from the stem base. */
+.flower {
+  transform-origin: 13% 100%;
+  animation:
+    bloom var(--bloom-dur) cubic-bezier(0.22, 0.8, 0.3, 1) var(--bloom-delay) both,
+    sway 3.4s ease-in-out calc(var(--bloom-delay) + var(--bloom-dur)) 2;
+}
+
+/* Hummingbird: approach from the side with a soft overshoot, then hover. */
+.flight {
+  animation: flight var(--flight-dur) cubic-bezier(0.25, 0.75, 0.3, 1) var(--flight-delay) both;
+}
+
+.hover {
+  animation: hover 1.5s ease-in-out calc(var(--flight-delay) + var(--flight-dur)) 2;
+}
+
+@keyframes halo-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  55% {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+}
+
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+}
+
+@keyframes bloom {
+  from {
+    opacity: 0;
+    transform: scale(0.9) rotate(-2deg);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(0.9deg);
+  }
+  70% {
+    transform: rotate(-0.6deg);
+  }
+}
+
+@keyframes flight {
+  0% {
+    opacity: 0;
+    transform: translate(var(--from-x), var(--from-y)) rotate(var(--from-r));
+  }
+  30% {
+    opacity: 1;
+  }
+  72% {
+    transform: translate(-1.2%, 0.8%) rotate(-1deg);
+  }
+  86% {
+    transform: translate(0.4%, -0.4%) rotate(0.3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hover {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.1%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .halo,
+  .ring,
+  .flower,
+  .flight,
+  .hover {
+    animation: none !important;
+  }
+}

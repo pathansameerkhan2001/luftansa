@@ -88,16 +88,16 @@ export function BestSellers() {
             <FlourishIcon className="size-8 shrink-0 sm:size-9" />
             <span className="h-px w-16 bg-gradient-to-l from-transparent to-brand-gold/80 min-[400px]:w-24 sm:w-48" />
           </div>
-          <p className="mt-3 text-[12px] font-semibold tracking-[0.3em] text-brand-black uppercase sm:text-[13px]">
+          <p className="mt-3 text-[11px] font-semibold tracking-[0.3em] text-brand-black uppercase sm:text-[12px]">
             Best Sellers
           </p>
           <h2
             id="best-sellers-heading"
-            className="mt-1 font-serif text-[40px] leading-[1.08] font-semibold italic tracking-[-0.01em] text-brand-black min-[400px]:text-[44px] sm:text-[54px] lg:text-[62px]"
+            className="mt-1 font-serif text-[34px] leading-[1.08] font-semibold italic tracking-[-0.01em] text-brand-black min-[400px]:text-[38px] sm:text-[46px] lg:text-[54px]"
           >
             Find Your Personality
           </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-pretty text-brand-text/80 sm:text-[17px]">
+          <p className="mx-auto mt-3 max-w-2xl text-[14.5px] leading-relaxed text-pretty text-brand-text/80 sm:text-[16px]">
             Five Luftansa signatures, each made for a different mood. Pick one to see its notes, its moment and its
             sizes.
           </p>

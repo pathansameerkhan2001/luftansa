@@ -33,11 +33,11 @@ export function CollectionPanel({ id, title, subtitle, products, placeholder, em
       <header className="text-center">
         <h2
           id={headingId}
-          className="font-serif text-[26px] leading-[1.1] font-semibold tracking-[0.04em] text-balance text-brand-black uppercase min-[400px]:text-[30px] sm:text-[38px] xl:text-[34px] 2xl:text-[40px]"
+          className="font-serif text-[23px] leading-[1.1] font-semibold tracking-[0.04em] text-balance text-brand-black uppercase min-[400px]:text-[26px] sm:text-[32px] xl:text-[29px] 2xl:text-[34px]"
         >
           {title}
         </h2>
-        <p className="mx-auto mt-2.5 max-w-md font-serif text-[18px] leading-snug text-pretty text-brand-text/85 sm:mt-3 sm:text-[21px]">
+        <p className="mx-auto mt-2.5 max-w-md font-serif text-[16px] leading-snug text-pretty text-brand-text/85 sm:mt-3 sm:text-[18.5px]">
           {subtitle}
         </p>
       </header>

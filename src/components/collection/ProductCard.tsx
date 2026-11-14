@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
-import { AddToCartButton, PricePanel, SizePills } from "@/components/pricing/PurchaseControls";
+import { AddToCartButton, ImageSizeLabels, PricePanel } from "@/components/pricing/PurchaseControls";
 import { formatInr, type ProductOption } from "@/data/products";
 import { dispatchAddToCart, dispatchWishlist } from "@/lib/cart-events";
 import { RollOnBottleIcon } from "./icons";
@@ -70,11 +70,24 @@ export function ProductCard({ product, placeholder = "spray" }: ProductCardProps
             />
           </div>
         )}
+
+        {/* Available sizes, presented on the product artwork (also the size selector). */}
+        {selected ? (
+          <ImageSizeLabels
+            options={options}
+            selectedId={selected.id}
+            onSelect={(id) => {
+              setOptionId(id);
+              setStatus("");
+            }}
+            label={`Choose a size for ${name}`}
+          />
+        ) : null}
       </div>
 
       {/* Details */}
-      <div className="flex flex-1 flex-col px-1.5 pt-4 pb-1.5 sm:px-3 sm:pt-5 sm:pb-2">
-        <h3 className="font-serif lining-nums text-[24px] leading-tight font-semibold text-brand-black sm:text-[26px]">
+      <div className="flex flex-1 flex-col px-1.5 pt-3.5 pb-1.5 sm:px-2.5 sm:pt-4 sm:pb-1.5">
+        <h3 className="font-serif lining-nums text-[22px] leading-tight font-semibold text-brand-black sm:text-[23px]">
           {name}
         </h3>
         {description ? (
@@ -83,19 +96,7 @@ export function ProductCard({ product, placeholder = "spray" }: ProductCardProps
 
         {selected ? (
           <>
-            <div className="mt-3.5">
-              <SizePills
-                options={options}
-                selectedId={selected.id}
-                onSelect={(id) => {
-                  setOptionId(id);
-                  setStatus("");
-                }}
-                label={`Choose a size for ${name}`}
-              />
-            </div>
-
-            <div className="mt-auto pt-4">
+            <div className="mt-auto pt-3.5">
               <PricePanel option={selected} productName={name} wishlisted={wishlisted} onWishlist={toggleWishlist} />
             </div>
 

@@ -3,6 +3,8 @@ import { BestSellers } from "@/components/bestsellers/BestSellers";
 import { HomeCollections } from "@/components/collection/HomeCollections";
 import { HeroSection } from "@/components/hero/HeroSection";
 import { ExploreByNotes } from "@/components/notes/ExploreByNotes";
+import { InstagramReels } from "@/components/reels/InstagramReels";
+import { BrandStory } from "@/components/story/BrandStory";
 
 export default function Home() {
   return (
@@ -12,6 +14,8 @@ export default function Home() {
       <HomeCollections />
       <ExploreByNotes />
       <BestSellers />
+      <InstagramReels />
+      <BrandStory />
     </main>
   );
 }

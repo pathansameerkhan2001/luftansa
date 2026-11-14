@@ -219,7 +219,7 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
                 </span>
                 <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
                   <PerfumeBottleIcon aria-hidden="true" className="size-20 text-brand-gold/60 sm:size-24" strokeWidth={0.6} />
-                  <p className="mt-4 font-serif text-[26px] leading-tight font-semibold italic text-brand-black sm:text-[30px]">
+                  <p className="mt-4 font-serif text-[23px] leading-tight font-semibold italic text-brand-black sm:text-[26px]">
                     {item.name}
                   </p>
                   <p className="mt-1 text-[13px] text-brand-text/65">Product photograph coming soon</p>
@@ -268,27 +268,27 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
 
       {/* Details */}
       <div className="min-w-0">
-        <h3 className="font-serif text-[38px] leading-none font-semibold tracking-[0.02em] text-brand-black uppercase sm:text-[44px] xl:text-[50px]">
+        <h3 className="font-serif text-[30px] leading-none font-semibold tracking-[0.03em] text-brand-black uppercase sm:text-[34px] xl:text-[38px]">
           {item.name}
         </h3>
         {/* Bottle size + confirmed product facts. */}
-        <ul className="mt-3 flex flex-wrap gap-2" aria-label="Product details">
+        <ul className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Product details">
           {[selected ? `${selected.label} bottle` : undefined, item.concentration, item.gender]
             .filter((v): v is string => Boolean(v))
             .map((fact) => (
               <li
                 key={fact}
-                className="rounded-full border border-brand-gold/45 bg-white/70 px-3 py-1 text-[12.5px] font-medium text-brand-text"
+                className="rounded-full border border-brand-gold/45 bg-white/70 px-2.5 py-0.5 text-[11.5px] font-medium text-brand-text"
               >
                 {fact}
               </li>
             ))}
         </ul>
-        <p className={`mt-3 text-[16px] font-semibold ${ACCENT_TEXT} sm:text-[17px]`}>
+        <p className={`mt-3 text-[14.5px] font-semibold ${ACCENT_TEXT} sm:text-[15px]`}>
           Perfect for:{" "}
           {item.perfectFor ?? <span className="font-normal text-brand-text/55 italic">details coming soon</span>}
         </p>
-        <p className="mt-2 text-[15px] leading-relaxed text-pretty text-brand-text/85 sm:text-[16px]">
+        <p className="mt-1.5 text-[14px] leading-relaxed text-pretty text-brand-text/85 sm:text-[14.5px]">
           {item.description ?? (
             <span className="text-brand-text/55 italic">
               Fragrance description coming soon. Notes and occasion will appear here once confirmed.
@@ -296,32 +296,32 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
           )}
         </p>
 
-        <hr className="my-5 border-brand-gold/30 sm:my-6" />
+        <hr className="my-4 border-brand-gold/30" />
 
         <ul className="grid grid-cols-3 divide-x divide-brand-gold/30" aria-label="Scent notes">
           {item.notes.map((note) => (
             <li key={note.tier} className="flex flex-col items-center px-1 text-center">
-              <span className="relative inline-flex size-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_6px_14px_-8px_rgba(60,45,20,0.5)] ring-1 ring-brand-gold/30 sm:size-16 xl:size-[72px]">
+              <span className="relative inline-flex size-12 items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_6px_14px_-8px_rgba(60,45,20,0.5)] ring-1 ring-brand-gold/30 sm:size-14">
                 {note.image ? (
-                  <Image src={note.image.src} alt={note.image.alt} fill sizes="72px" className="object-cover" />
+                  <Image src={note.image.src} alt={note.image.alt} fill sizes="56px" className="object-cover" />
                 ) : (
-                  <Sparkles aria-hidden="true" className="size-6 text-brand-gold/70" strokeWidth={1.25} />
+                  <Sparkles aria-hidden="true" className="size-5 text-brand-gold/70" strokeWidth={1.25} />
                 )}
               </span>
-              <span className="mt-2.5 text-[12.5px] text-brand-text/70 sm:text-[13px]">{TIER_LABEL[note.tier]}</span>
-              <span className="mt-0.5 text-[15px] font-semibold text-brand-black sm:text-[16px]">
-                {note.name ?? <span className="text-[13px] font-normal text-brand-text/50 italic">Coming soon</span>}
+              <span className="mt-2 text-[11.5px] text-brand-text/70 sm:text-[12px]">{TIER_LABEL[note.tier]}</span>
+              <span className="mt-0.5 text-[14px] font-semibold text-brand-black sm:text-[14.5px]">
+                {note.name ?? <span className="text-[12px] font-normal text-brand-text/50 italic">Coming soon</span>}
               </span>
             </li>
           ))}
         </ul>
 
-        <hr className="my-5 border-brand-gold/30 sm:my-6" />
+        <hr className="my-4 border-brand-gold/30" />
 
-        <p id="best-seller-size-label" className={`text-[16px] font-semibold ${ACCENT_TEXT} sm:text-[17px]`}>
+        <p id="best-seller-size-label" className={`text-[14.5px] font-semibold ${ACCENT_TEXT} sm:text-[15px]`}>
           Select Size
         </p>
-        <div className="mt-3" data-size-cards>
+        <div className="mt-2.5" data-size-cards>
           <SizePriceCards
             options={item.options}
             selectedId={selected?.id}
@@ -334,12 +334,12 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
         </div>
 
         {selected ? (
-          <div className="mt-5 sm:mt-6">
+          <div className="mt-4">
             <PricePanel option={selected} productName={item.name} onWishlist={wishlist} size="feature" />
           </div>
         ) : null}
 
-        <div className="mt-3 sm:mt-4">
+        <div className="mt-3">
           <AddToCartButton
             onClick={addToCart}
             disabled={!selected}
@@ -347,7 +347,7 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
             srDetail={selected ? `${item.name}, ${selected.label}, ${formatInr(selected.priceInr)}` : undefined}
           />
         </div>
-        <p role="status" className="mt-3 min-h-[1.25rem] text-[13px] text-brand-text/70">
+        <p role="status" className="mt-2 min-h-[1.25rem] text-[12.5px] text-brand-text/70">
           {status}
         </p>
       </div>

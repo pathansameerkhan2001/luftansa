@@ -43,7 +43,7 @@ function RollOnComingSoon() {
       <p className="mt-5 text-[11px] font-medium tracking-[0.32em] text-brand-black uppercase sm:text-[12px]">
         Coming soon
       </p>
-      <p className="mt-2 max-w-xs font-serif text-[19px] leading-snug text-brand-text/80">
+      <p className="mt-2 max-w-xs font-serif text-[17px] leading-snug text-brand-text/80">
         Our roll-on fragrances will be available here shortly.
       </p>
     </div>
