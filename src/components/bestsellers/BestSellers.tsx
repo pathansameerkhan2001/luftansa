@@ -3,32 +3,62 @@ import { FlourishIcon } from "@/components/collection/icons";
 import { HERO_BANNER } from "@/components/hero/hero-banner";
 import { getAssetUrl } from "@/lib/assets";
 import { productHref } from "@/lib/routes";
-import { BEST_SELLER_SLUGS, getProductsBySlugs, sprayOptions } from "@/data/products";
-import { FRAGRANCE_PROFILES, getNoteImage, type NoteTier } from "@/data/fragrance-profiles";
+import { BEST_SELLER_SLUGS } from "@/data/products";
+import { FRAGRANCE_PROFILES, getNoteImage } from "@/data/fragrance-profiles";
+import { getActiveStorefrontProducts } from "@/lib/storefront/products";
 import { BestSellersShowcase, type BestSellerItem } from "./BestSellersShowcase";
 
-const TIERS: readonly NoteTier[] = ["top", "middle", "base"];
+async function buildItems(): Promise<BestSellerItem[]> {
+  const allActive = await getActiveStorefrontProducts();
+  const productMap = new Map(allActive.map((p) => [p.slug, p]));
 
-function buildItems(): BestSellerItem[] {
-  return getProductsBySlugs(BEST_SELLER_SLUGS).map((product) => {
+  // Match BEST_SELLER_SLUGS in order
+  const selected = BEST_SELLER_SLUGS
+    .map((slug) => productMap.get(slug))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+
+  // If there are other active products with bestseller: true in DynamoDB, include them:
+  for (const p of allActive) {
+    if (p.bestseller && !selected.some((item) => item.slug === p.slug)) {
+      selected.push(p);
+    }
+  }
+
+  return selected.map((product) => {
     const profile = FRAGRANCE_PROFILES[product.slug] ?? {};
+    const topNote = product.notes.top[0];
+    const heartNote = product.notes.heart[0];
+    const baseNote = product.notes.base[0];
+
+    const notes = [
+      {
+        tier: "top" as const,
+        name: topNote?.name ?? profile.notes?.top,
+        image: topNote?.image ?? (profile.notes?.top ? getNoteImage(profile.notes.top) : undefined),
+      },
+      {
+        tier: "middle" as const,
+        name: heartNote?.name ?? profile.notes?.middle,
+        image: heartNote?.image ?? (profile.notes?.middle ? getNoteImage(profile.notes.middle) : undefined),
+      },
+      {
+        tier: "base" as const,
+        name: baseNote?.name ?? profile.notes?.base,
+        image: baseNote?.image ?? (profile.notes?.base ? getNoteImage(profile.notes.base) : undefined),
+      },
+    ];
+
     return {
       slug: product.slug,
       name: product.name,
       href: productHref(product.slug),
-      // Spray perfumes: confirmed sizes at the standard price list (+ configured MRP/offers).
-      options: sprayOptions(product),
+      options: product.options,
       concentration: product.concentration,
       gender: product.gender,
-      image: product.image
-        ? { src: getAssetUrl(product.image.key), alt: product.image.alt, objectPosition: product.image.objectPosition }
-        : undefined,
+      image: product.mainImage,
       perfectFor: profile.perfectFor,
-      description: profile.description,
-      notes: TIERS.map((tier) => {
-        const name = profile.notes?.[tier];
-        return { tier, name, image: name ? getNoteImage(name) : undefined };
-      }),
+      description: product.description ?? profile.description,
+      notes,
     };
   });
 }
@@ -50,8 +80,8 @@ function LeafShadow({ className }: { className?: string }) {
 }
 
 /** "Best Sellers / Find Your Personality" homepage section (Server Component). */
-export function BestSellers() {
-  const items = buildItems();
+export async function BestSellers() {
+  const items = await buildItems();
   if (items.length === 0) return null;
   const textureSrc = HERO_BANNER.key ? getAssetUrl(HERO_BANNER.key) : HERO_BANNER.src;
 

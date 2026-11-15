@@ -1,7 +1,6 @@
 import { getAssetUrl } from "@/lib/assets";
 import { productHref } from "@/lib/routes";
 import {
-  getProductsBySlugs,
   PERSONALITY_COLLECTION_SLUGS,
   ROLL_ON_PRODUCTS,
   rollOnOptions,
@@ -9,6 +8,7 @@ import {
   type Product,
   type RollOnProduct,
 } from "@/data/products";
+import { getActiveStorefrontProducts, toStorefrontCardData } from "@/lib/storefront/products";
 import { CollectionPanel } from "./CollectionPanel";
 import { RollOnBottleIcon } from "./icons";
 import type { ProductCardData } from "./ProductCard";
@@ -53,8 +53,23 @@ function RollOnComingSoon() {
 }
 
 /** Homepage collections: Personality and Roll On panels (side by side from xl). */
-export function HomeCollections() {
-  const personality = getProductsBySlugs(PERSONALITY_COLLECTION_SLUGS).map(toSprayCardData);
+export async function HomeCollections() {
+  const allActive = await getActiveStorefrontProducts();
+  const productMap = new Map(allActive.map((p) => [p.slug, p]));
+
+  // Match PERSONALITY_COLLECTION_SLUGS in order
+  const personality = PERSONALITY_COLLECTION_SLUGS
+    .map((slug) => productMap.get(slug))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .map(toStorefrontCardData);
+
+  // Append any additional active products from DynamoDB not in PERSONALITY_COLLECTION_SLUGS
+  for (const p of allActive) {
+    if (!personality.some((item) => item.slug === p.slug)) {
+      personality.push(toStorefrontCardData(p));
+    }
+  }
+
   const rollOns = ROLL_ON_PRODUCTS.map(toRollOnCardData);
 
   return (

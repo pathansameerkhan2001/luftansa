@@ -56,6 +56,23 @@ export const STANDARD_PRICES_INR: Record<BottleSizeMl, number> = {
   100: 1000,
 };
 
+/** Individual fragrance note with its OWN image and description */
+export const fragranceNoteItemSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1).max(64),
+  imageKey: z.string().max(512).optional(),
+  description: z.string().max(500).optional(),
+});
+export type FragranceNoteItem = z.infer<typeof fragranceNoteItemSchema>;
+
+/** Three distinct fragrance note groups: Top, Heart and Base */
+export const fragranceNotesSchema = z.object({
+  top: z.array(fragranceNoteItemSchema).default([]),
+  heart: z.array(fragranceNoteItemSchema).default([]),
+  base: z.array(fragranceNoteItemSchema).default([]),
+});
+export type FragranceNotes = z.infer<typeof fragranceNotesSchema>;
+
 /** Product variant stored item (sk: VARIANT#00030) */
 export const productVariantItemSchema = baseItemSchema.extend({
   entityType: z.literal(ENTITY.variant),
@@ -78,8 +95,13 @@ export const productItemSchema = baseItemSchema.extend({
   category: z.string().min(1).max(64).default("Perfume"),
   status: productStatusSchema.default("ACTIVE"),
   sizes: z.array(bottleSizeSchema).min(1),
-  imageKey: z.string().max(256).optional(),
+  imageKey: z.string().max(512).optional(),
   imageAlt: z.string().max(256).optional(),
+  mainImageKey: z.string().max(512).optional(),
+  mainImageAlt: z.string().max(256).optional(),
+  galleryImageKeys: z.array(z.string().max(512)).default([]),
+  keywords: z.array(z.string().min(1).max(64)).default([]),
+  notes: fragranceNotesSchema.default({ top: [], heart: [], base: [] }),
   concentration: z.string().max(64).optional(),
   gender: z.string().max(32).optional(),
   featured: z.boolean().default(false),
@@ -111,8 +133,13 @@ export const productCreateInputSchema = z.object({
   category: z.string().min(1).max(64).default("Perfume"),
   status: productStatusSchema.default("ACTIVE"),
   sizes: z.array(bottleSizeSchema).min(1).default([30, 50, 100]),
-  imageKey: z.string().max(256).optional(),
+  imageKey: z.string().max(512).optional(),
   imageAlt: z.string().max(256).optional(),
+  mainImageKey: z.string().max(512).optional(),
+  mainImageAlt: z.string().max(256).optional(),
+  galleryImageKeys: z.array(z.string().max(512)).optional().default([]),
+  keywords: z.array(z.string().min(1).max(64)).optional().default([]),
+  notes: fragranceNotesSchema.optional().default({ top: [], heart: [], base: [] }),
   concentration: z.string().max(64).optional(),
   gender: z.string().max(32).optional(),
   featured: z.boolean().default(false),
@@ -129,8 +156,13 @@ export const productUpdateInputSchema = z.object({
   category: z.string().min(1).max(64).optional(),
   status: productStatusSchema.optional(),
   sizes: z.array(bottleSizeSchema).min(1).optional(),
-  imageKey: z.string().max(256).optional().nullable(),
+  imageKey: z.string().max(512).optional().nullable(),
   imageAlt: z.string().max(256).optional().nullable(),
+  mainImageKey: z.string().max(512).optional().nullable(),
+  mainImageAlt: z.string().max(256).optional().nullable(),
+  galleryImageKeys: z.array(z.string().max(512)).optional(),
+  keywords: z.array(z.string().min(1).max(64)).optional(),
+  notes: fragranceNotesSchema.optional(),
   concentration: z.string().max(64).optional().nullable(),
   gender: z.string().max(32).optional().nullable(),
   featured: z.boolean().optional(),

@@ -27,9 +27,9 @@ export const ABOUT_ROUTE: string | null = null;
 
 const PRODUCT_SLUGS = new Set(PRODUCTS.map((p) => p.slug));
 
-/** URL of a product's detail page, or undefined if the page or product does not exist. */
+/** URL of a product's detail page, or undefined if the page builder does not exist. */
 export function productHref(slug: string | undefined): string | undefined {
-  if (!slug || !PRODUCT_DETAIL_ROUTE || !PRODUCT_SLUGS.has(slug)) return undefined;
+  if (!slug || !PRODUCT_DETAIL_ROUTE) return undefined;
   return PRODUCT_DETAIL_ROUTE(slug);
 }
 

@@ -301,7 +301,7 @@ async function runServiceTests() {
   const audit = new AuditService(repo);
   const adminEmail = "admin@luftansa.in";
 
-  // Test Create
+  // Test Create with images, keywords and individual fragrance notes
   const created = await createProduct(repo, audit, adminEmail, {
     id: "oud-forest",
     name: "Oud Forest",
@@ -309,6 +309,24 @@ async function runServiceTests() {
     category: "Perfume",
     status: "ACTIVE",
     sizes: [30, 50, 100],
+    mainImageKey: "products/oud-forest/main/hero.webp",
+    mainImageAlt: "Oud Forest bottle",
+    galleryImageKeys: [
+      "products/oud-forest/gallery/side.webp",
+      "products/oud-forest/gallery/packaging.webp",
+    ],
+    keywords: ["oud", "woody", "smoky", "evening"],
+    notes: {
+      top: [
+        { id: "note-1", name: "Bergamot", imageKey: "notes/bergamot.webp", description: "Citrus burst" },
+      ],
+      heart: [
+        { id: "note-2", name: "Damask Rose", imageKey: "notes/damask-rose.webp", description: "Rich floral" },
+      ],
+      base: [
+        { id: "note-3", name: "Cambodian Oud", imageKey: "notes/cambodian-oud.webp", description: "Resinous wood" },
+      ],
+    },
     variants: [
       { sizeMl: 30, stockQuantity: 25 },
       { sizeMl: 50, stockQuantity: 40 },
@@ -318,6 +336,13 @@ async function runServiceTests() {
 
   assert.equal(created.product.id, "oud-forest");
   assert.equal(created.product.version, 1);
+  assert.equal(created.product.mainImageKey, "products/oud-forest/main/hero.webp");
+  assert.equal(created.product.galleryImageKeys?.length, 2);
+  assert.deepEqual(created.product.keywords, ["oud", "woody", "smoky", "evening"]);
+  assert.equal(created.product.notes?.top[0]?.name, "Bergamot");
+  assert.equal(created.product.notes?.top[0]?.imageKey, "notes/bergamot.webp");
+  assert.equal(created.product.notes?.heart[0]?.name, "Damask Rose");
+  assert.equal(created.product.notes?.base[0]?.name, "Cambodian Oud");
   assert.equal(created.variants.length, 3);
   assert.equal(created.variants[0].sizeMl, 30);
   assert.equal(created.variants[0].priceInr, 400);
@@ -326,7 +351,7 @@ async function runServiceTests() {
   assert.equal(created.variants[1].priceInr, 630);
   assert.equal(created.variants[2].sizeMl, 100);
   assert.equal(created.variants[2].priceInr, 1000);
-  console.log("   ✓ Product creation with standard prices and variants verified");
+  console.log("   ✓ Product creation with standard prices, images, keywords & fragrance notes verified");
 
   // Duplicate create must fail
   await assert.rejects(
@@ -355,10 +380,12 @@ async function runServiceTests() {
   assert.equal(fetched.variants.length, 3);
   console.log("   ✓ Get product with variants verified");
 
-  // Test Optimistic Update
+  // Test Optimistic Update with updated keywords and gallery
   const updated = await updateProduct(repo, audit, adminEmail, "oud-forest", {
     version: 1, // Correct current version
     name: "Oud Forest Royale",
+    keywords: ["oud", "woody", "royal"],
+    galleryImageKeys: ["products/oud-forest/gallery/new-angle.webp"],
     variants: [
       { sizeMl: 30, stockQuantity: 30 },
       { sizeMl: 50, stockQuantity: 45 },
@@ -367,7 +394,9 @@ async function runServiceTests() {
   });
   assert.equal(updated.product.name, "Oud Forest Royale");
   assert.equal(updated.product.version, 2, "Version must be incremented to 2");
-  console.log("   ✓ Optimistic concurrency update verified");
+  assert.deepEqual(updated.product.keywords, ["oud", "woody", "royal"]);
+  assert.equal(updated.product.galleryImageKeys?.length, 1);
+  console.log("   ✓ Optimistic concurrency update with keyword/gallery changes verified");
 
   // Stale version update must fail
   await assert.rejects(

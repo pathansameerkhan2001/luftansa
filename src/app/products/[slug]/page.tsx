@@ -6,52 +6,60 @@ import { ProductPurchase } from "@/components/product/ProductPurchase";
 import { ProductTabs } from "@/components/product/ProductTabs";
 import { TrustBadges } from "@/components/product/TrustBadges";
 import type { ProductDetailData } from "@/components/product/types";
-import { FRAGRANCE_PROFILES } from "@/data/fragrance-profiles";
-import { PRODUCTS, sprayOptions, type Product } from "@/data/products";
+import { PRODUCTS } from "@/data/products";
 import { STORE_NAME } from "@/data/store";
-import { getAssetUrl } from "@/lib/assets";
+import {
+  getActiveStorefrontProductBySlug,
+  type UnifiedStorefrontProduct,
+} from "@/lib/storefront/products";
 
-// Only catalogue products have pages; any other slug is a 404.
-export const dynamicParams = false;
+// Allow on-demand server rendering for newly created active DynamoDB products
+export const dynamicParams = true;
 
 export function generateStaticParams() {
   return PRODUCTS.map((p) => ({ slug: p.slug }));
 }
 
-function findProduct(slug: string): Product | undefined {
-  return PRODUCTS.find((p) => p.slug === slug);
-}
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const product = findProduct((await params).slug);
+  const { slug } = await params;
+  const product = await getActiveStorefrontProductBySlug(slug);
   if (!product) return {};
   return {
     title: `${product.name} | ${STORE_NAME}`,
-    description: product.description ?? FRAGRANCE_PROFILES[product.slug]?.description ?? `${product.name} by ${STORE_NAME}.`,
+    description: product.description ?? `${product.name} by ${STORE_NAME}.`,
   };
 }
 
-/** Builds the page data from confirmed catalogue + profile information only. */
-function toDetailData(product: Product): ProductDetailData {
-  const profile = FRAGRANCE_PROFILES[product.slug] ?? {};
-  const photos = [product.image, ...(product.gallery ?? [])].filter((img) => img !== undefined);
+/** Builds the detail view model from the unified product */
+function toDetailData(product: UnifiedStorefrontProduct): ProductDetailData {
+  const images = [product.mainImage, ...product.galleryImages].filter(
+    (img): img is { src: string; alt: string; objectPosition?: string } => Boolean(img),
+  );
+
   return {
     slug: product.slug,
     name: product.name,
-    category: product.category ?? "Perfume",
-    description: product.description ?? profile.description,
-    perfectFor: profile.perfectFor,
+    category: product.category,
+    description: product.description,
     concentration: product.concentration,
     gender: product.gender,
-    options: sprayOptions(product),
-    images: photos.map((img) => ({ src: getAssetUrl(img.key), alt: img.alt, objectPosition: img.objectPosition })),
-    notes: { top: profile.notes?.top, heart: profile.notes?.middle, base: profile.notes?.base },
+    options: product.options,
+    images,
+    keywords: product.keywords,
+    fragranceNotes: product.notes,
+    notes: {
+      top: product.notes.top.map((n) => n.name).join(" · ") || undefined,
+      heart: product.notes.heart.map((n) => n.name).join(" · ") || undefined,
+      base: product.notes.base.map((n) => n.name).join(" · ") || undefined,
+    },
   };
 }
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
-  const product = findProduct((await params).slug);
+  const { slug } = await params;
+  const product = await getActiveStorefrontProductBySlug(slug);
   if (!product) notFound();
+
   const data = toDetailData(product);
 
   return (
@@ -77,6 +85,21 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           </div>
           <div className="min-w-0">
             <ProductPurchase product={data} />
+
+            {data.keywords && data.keywords.length > 0 && (
+              <div className="mt-5 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold tracking-wider uppercase text-brand-text/60 mr-1">Tags:</span>
+                {data.keywords.map((kw) => (
+                  <span
+                    key={kw}
+                    className="rounded-full border border-brand-gold/30 bg-white/70 px-2.5 py-0.5 text-[11.5px] text-brand-black"
+                  >
+                    #{kw}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className="mt-6">
               <TrustBadges />
             </div>

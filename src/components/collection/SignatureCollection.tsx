@@ -1,13 +1,18 @@
-import { getProductsBySlugs, SIGNATURE_PRODUCT_SLUGS } from "@/data/products";
-import { toSprayCardData } from "./HomeCollections";
+import { SIGNATURE_PRODUCT_SLUGS } from "@/data/products";
+import { getActiveStorefrontProducts, toStorefrontCardData } from "@/lib/storefront/products";
 import { ProductCard, type ProductCardData } from "./ProductCard";
 
 /**
- * "Our Collection: Signature Fragrances" (Server Component). Product data comes
- * from src/data/products.ts; S3 image keys resolve to URLs on the server.
+ * "Our Collection: Signature Fragrances" (Server Component).
+ * Active products from DynamoDB or hardcoded fallback.
  */
-export function SignatureCollection({ slugs = SIGNATURE_PRODUCT_SLUGS }: { slugs?: readonly string[] }) {
-  const products: ProductCardData[] = getProductsBySlugs(slugs).map(toSprayCardData);
+export async function SignatureCollection({ slugs = SIGNATURE_PRODUCT_SLUGS }: { slugs?: readonly string[] }) {
+  const allActive = await getActiveStorefrontProducts();
+  const productMap = new Map(allActive.map((p) => [p.slug, p]));
+  const products: ProductCardData[] = slugs
+    .map((s) => productMap.get(s))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .map(toStorefrontCardData);
 
   if (products.length === 0) return null;
 

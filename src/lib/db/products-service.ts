@@ -76,6 +76,9 @@ export async function createProduct(
   const input = productCreateInputSchema.parse(rawInput);
   const now = new Date().toISOString();
 
+  const mainImageKey = input.mainImageKey ?? input.imageKey;
+  const mainImageAlt = input.mainImageAlt ?? input.imageAlt;
+
   const productItem: ProductItem = {
     pk: keys.product(input.id).pk,
     sk: keys.product(input.id).sk,
@@ -86,8 +89,13 @@ export async function createProduct(
     category: input.category,
     status: input.status,
     sizes: input.sizes,
-    imageKey: input.imageKey,
-    imageAlt: input.imageAlt,
+    imageKey: mainImageKey,
+    imageAlt: mainImageAlt,
+    mainImageKey,
+    mainImageAlt,
+    galleryImageKeys: input.galleryImageKeys ?? [],
+    keywords: input.keywords ?? [],
+    notes: input.notes ?? { top: [], heart: [], base: [] },
     concentration: input.concentration,
     gender: input.gender,
     featured: input.featured ?? false,
@@ -173,6 +181,20 @@ export async function updateProduct(
   const nextCategory = input.category ?? existing.product.category;
   const nextSizes = input.sizes ?? existing.product.sizes;
 
+  const nextMainImageKey =
+    input.mainImageKey !== undefined
+      ? (input.mainImageKey === null ? undefined : input.mainImageKey)
+      : input.imageKey !== undefined
+        ? (input.imageKey === null ? undefined : input.imageKey)
+        : (existing.product.mainImageKey ?? existing.product.imageKey);
+
+  const nextMainImageAlt =
+    input.mainImageAlt !== undefined
+      ? (input.mainImageAlt === null ? undefined : input.mainImageAlt)
+      : input.imageAlt !== undefined
+        ? (input.imageAlt === null ? undefined : input.imageAlt)
+        : (existing.product.mainImageAlt ?? existing.product.imageAlt);
+
   const nextProductItem: ProductItem = {
     ...existing.product,
     name: input.name ?? existing.product.name,
@@ -180,8 +202,13 @@ export async function updateProduct(
     category: nextCategory,
     status: nextStatus,
     sizes: nextSizes,
-    imageKey: input.imageKey === null ? undefined : (input.imageKey ?? existing.product.imageKey),
-    imageAlt: input.imageAlt === null ? undefined : (input.imageAlt ?? existing.product.imageAlt),
+    imageKey: nextMainImageKey,
+    imageAlt: nextMainImageAlt,
+    mainImageKey: nextMainImageKey,
+    mainImageAlt: nextMainImageAlt,
+    galleryImageKeys: input.galleryImageKeys ?? existing.product.galleryImageKeys ?? [],
+    keywords: input.keywords ?? existing.product.keywords ?? [],
+    notes: input.notes ?? existing.product.notes ?? { top: [], heart: [], base: [] },
     concentration: input.concentration === null ? undefined : (input.concentration ?? existing.product.concentration),
     gender: input.gender === null ? undefined : (input.gender ?? existing.product.gender),
     featured: input.featured ?? existing.product.featured,
