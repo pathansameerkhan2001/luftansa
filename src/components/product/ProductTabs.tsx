@@ -144,24 +144,30 @@ function HowToUsePanel() {
 
 /** Fragrance Notes / Details / How to Use tabs (WAI-ARIA tabs pattern). */
 export function ProductTabs({ product }: { product: ProductDetailData }) {
-  const [tab, setTab] = useState<TabKey>("notes");
+  const showNotesTab =
+    product.hasNotes !== false &&
+    (Boolean(product.fragranceNotes?.top?.length || product.fragranceNotes?.heart?.length || product.fragranceNotes?.base?.length) ||
+      Boolean(product.notes?.top || product.notes?.heart || product.notes?.base));
+
+  const visibleTabs = TABS.filter((t) => (t.key === "notes" ? showNotesTab : true));
+  const [tab, setTab] = useState<TabKey>(showNotesTab ? "notes" : "details");
   const baseId = useId();
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const onKeys = (e: KeyboardEvent<HTMLDivElement>) => {
-    const i = TABS.findIndex((t) => t.key === tab);
-    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: TABS.length - 1 }[e.key];
+    const i = visibleTabs.findIndex((t) => t.key === tab);
+    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: visibleTabs.length - 1 }[e.key];
     if (next === undefined) return;
     e.preventDefault();
-    const j = (next + TABS.length) % TABS.length;
-    setTab(TABS[j].key);
+    const j = (next + visibleTabs.length) % visibleTabs.length;
+    setTab(visibleTabs[j].key);
     refs.current[j]?.focus();
   };
 
   return (
     <div>
       <div role="tablist" aria-label="Product information" onKeyDown={onKeys} className="flex gap-1 overflow-x-auto border-b border-brand-gold/30 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {TABS.map((t, i) => {
+        {visibleTabs.map((t, i) => {
           const selected = t.key === tab;
           return (
             <button
@@ -185,7 +191,7 @@ export function ProductTabs({ product }: { product: ProductDetailData }) {
           );
         })}
       </div>
-      {TABS.map((t) => (
+      {visibleTabs.map((t) => (
         <div
           key={t.key}
           id={`${baseId}-panel-${t.key}`}

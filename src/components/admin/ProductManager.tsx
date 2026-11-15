@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   AlertCircle,
@@ -91,12 +91,36 @@ export function ProductManager({
   const [formName, setFormName] = useState(initialActiveProduct?.name ?? "");
   const [formId, setFormId] = useState(initialActiveProduct?.id ?? "");
   const [formDescription, setFormDescription] = useState(initialActiveProduct?.description ?? "");
-  const [formCategory, setFormCategory] = useState(initialActiveProduct?.category ?? "Perfume");
+  const [formProductTypeId, setFormProductTypeId] = useState(initialActiveProduct?.productTypeId ?? "perfume-spray");
+  const [formCategory, setFormCategory] = useState(initialActiveProduct?.category ?? "Perfume Spray");
   const [formStatus, setFormStatus] = useState<"ACTIVE" | "INACTIVE">(initialActiveProduct?.status ?? "ACTIVE");
+  const [notesEnabled, setNotesEnabled] = useState<boolean>(initialActiveProduct?.notesEnabled ?? true);
   const [formGender, setFormGender] = useState(initialActiveProduct?.gender ?? "Unisex");
   const [formConcentration, setFormConcentration] = useState(initialActiveProduct?.concentration ?? "Eau de Parfum");
   const [formFeatured, setFormFeatured] = useState(initialActiveProduct?.featured ?? false);
   const [formBestseller, setFormBestseller] = useState(initialActiveProduct?.bestseller ?? false);
+
+  // Product Types State
+  const [productTypes, setProductTypes] = useState<Array<{
+    id: string;
+    name: string;
+    description?: string;
+    defaultUnit: "ml" | "g" | "pieces" | "units" | "oz";
+    hasNotes: boolean;
+    status: "ACTIVE" | "INACTIVE";
+  }>>([
+    { id: "perfume-spray", name: "Perfume Spray", defaultUnit: "ml", hasNotes: true, status: "ACTIVE" },
+    { id: "roll-on", name: "Roll-On", defaultUnit: "ml", hasNotes: true, status: "ACTIVE" },
+    { id: "air-freshener", name: "Air Freshener", defaultUnit: "ml", hasNotes: false, status: "ACTIVE" },
+    { id: "attar", name: "Attar", defaultUnit: "ml", hasNotes: true, status: "ACTIVE" },
+  ]);
+
+  // New Product Type Modal
+  const [isNewTypeModalOpen, setIsNewTypeModalOpen] = useState(false);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [newTypeUnit, setNewTypeUnit] = useState<"ml" | "g" | "pieces" | "units" | "oz">("ml");
+  const [newTypeHasNotes, setNewTypeHasNotes] = useState(true);
+  const [newTypeSubmitting, setNewTypeSubmitting] = useState(false);
 
   // Form Media State (S3)
   const [mainImageKey, setMainImageKey] = useState<string>(
@@ -125,28 +149,66 @@ export function ProductManager({
     },
   );
 
-  // Variant Form State: 30ml, 50ml, 100ml
-  const [variant30Stock, setVariant30Stock] = useState<number>(0);
-  const [variant30Price, setVariant30Price] = useState<number>(STANDARD_PRICES[30]);
-  const [variant30Active, setVariant30Active] = useState<boolean>(true);
+  // Dynamic Variants Form State (Stable unique IDs, capacity, unit, price, stock, SKU)
+  const [variantsList, setVariantsList] = useState<Array<{
+    id: string;
+    capacity: number;
+    unit: "ml" | "g" | "pieces" | "units" | "oz";
+    label: string;
+    priceInr: number;
+    mrpInr?: number;
+    stockQuantity: number;
+    sku: string;
+    status: "ACTIVE" | "INACTIVE";
+  }>>([
+    { id: "00030", capacity: 30, unit: "ml", label: "30 ml", priceInr: 400, stockQuantity: 0, sku: "LUF-30ML", status: "ACTIVE" },
+    { id: "00050", capacity: 50, unit: "ml", label: "50 ml", priceInr: 630, stockQuantity: 0, sku: "LUF-50ML", status: "ACTIVE" },
+    { id: "00100", capacity: 100, unit: "ml", label: "100 ml", priceInr: 1000, stockQuantity: 0, sku: "LUF-100ML", status: "ACTIVE" },
+  ]);
 
-  const [variant50Stock, setVariant50Stock] = useState<number>(0);
-  const [variant50Price, setVariant50Price] = useState<number>(STANDARD_PRICES[50]);
-  const [variant50Active, setVariant50Active] = useState<boolean>(true);
+  // Load product types on mount
+  useEffect(() => {
+    fetch("/api/admin/product-types")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && Array.isArray(data.items) && data.items.length > 0) {
+          setProductTypes(data.items);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
-  const [variant100Stock, setVariant100Stock] = useState<number>(0);
-  const [variant100Price, setVariant100Price] = useState<number>(STANDARD_PRICES[100]);
-  const [variant100Active, setVariant100Active] = useState<boolean>(true);
-
-  // S3 Presigned Upload Helper
+  // S3 Upload Helper: Primary same-origin server upload with presigned direct fallback
   const uploadFileToS3 = async (
     file: File,
     folder: "main" | "gallery" | "notes",
   ): Promise<{ key: string; publicUrl: string }> => {
     const slug = formId.trim() || slugify(formName) || "temp-fragrance";
 
-    // 1. Get presigned upload URL from secure admin route
-    const res = await fetch("/api/admin/media/presign-upload", {
+    // 1. Primary Strategy: Same-Origin server upload (bypasses browser-to-S3 CORS preflight)
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", folder);
+      formData.append("slug", slug);
+
+      const serverRes = await fetch("/api/admin/media/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (serverRes.ok) {
+        const serverData = await serverRes.json();
+        if (serverData.key) {
+          return { key: serverData.key, publicUrl: serverData.publicUrl };
+        }
+      }
+    } catch {
+      // If server upload proxy is not reachable, fall through to presigned S3 PUT
+    }
+
+    // 2. Fallback Strategy: Direct S3 upload via presigned PUT URL
+    const presignRes = await fetch("/api/admin/media/presign-upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -158,13 +220,12 @@ export function ProductManager({
       }),
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || data.error || "Failed to generate upload URL");
+    const presignData = await presignRes.json();
+    if (!presignRes.ok) {
+      throw new Error(presignData.message || presignData.error || "Failed to generate upload URL");
     }
 
-    // 2. Upload file directly to S3 via presigned PUT
-    const s3Res = await fetch(data.uploadUrl, {
+    const s3Res = await fetch(presignData.uploadUrl, {
       method: "PUT",
       headers: { "Content-Type": file.type },
       body: file,
@@ -174,7 +235,7 @@ export function ProductManager({
       throw new Error(`S3 upload failed (${s3Res.status} ${s3Res.statusText})`);
     }
 
-    return { key: data.key, publicUrl: data.publicUrl };
+    return { key: presignData.key, publicUrl: presignData.publicUrl };
   };
 
   // Main Image Upload Handler
@@ -335,7 +396,10 @@ export function ProductManager({
     setFormName("");
     setFormId("");
     setFormDescription("");
-    setFormCategory("Perfume");
+    const defaultType = productTypes[0] || { id: "perfume-spray", name: "Perfume Spray", defaultUnit: "ml", hasNotes: true };
+    setFormProductTypeId(defaultType.id);
+    setFormCategory(defaultType.name);
+    setNotesEnabled(defaultType.hasNotes);
     setFormStatus("ACTIVE");
     setFormGender("Unisex");
     setFormConcentration("Eau de Parfum");
@@ -349,17 +413,11 @@ export function ProductManager({
     setKeywordInput("");
     setNotes({ top: [], heart: [], base: [] });
 
-    setVariant30Stock(0);
-    setVariant30Price(STANDARD_PRICES[30]);
-    setVariant30Active(true);
-
-    setVariant50Stock(0);
-    setVariant50Price(STANDARD_PRICES[50]);
-    setVariant50Active(true);
-
-    setVariant100Stock(0);
-    setVariant100Price(STANDARD_PRICES[100]);
-    setVariant100Active(true);
+    setVariantsList([
+      { id: `v_${Date.now().toString(36)}_1`, capacity: 30, unit: "ml", label: "30 ml", priceInr: 400, stockQuantity: 0, sku: "", status: "ACTIVE" },
+      { id: `v_${Date.now().toString(36)}_2`, capacity: 50, unit: "ml", label: "50 ml", priceInr: 630, stockQuantity: 0, sku: "", status: "ACTIVE" },
+      { id: `v_${Date.now().toString(36)}_3`, capacity: 100, unit: "ml", label: "100 ml", priceInr: 1000, stockQuantity: 0, sku: "", status: "ACTIVE" },
+    ]);
 
     setIsModalOpen(true);
     setErrorMessage(null);
@@ -371,8 +429,10 @@ export function ProductManager({
     setFormName(product.name);
     setFormId(product.id);
     setFormDescription(product.description || "");
-    setFormCategory(product.category);
+    setFormProductTypeId(product.productTypeId || "perfume-spray");
+    setFormCategory(product.category || "Perfume Spray");
     setFormStatus(product.status);
+    setNotesEnabled(product.notesEnabled ?? true);
     setFormGender(product.gender || "Unisex");
     setFormConcentration(product.concentration || "Eau de Parfum");
     setFormFeatured(product.featured || false);
@@ -385,37 +445,52 @@ export function ProductManager({
     setKeywordInput("");
     setNotes(product.notes || { top: [], heart: [], base: [] });
 
-    // Fetch existing variants
+    // Fetch fresh product data and variants directly from base table
     try {
       const res = await fetch(`/api/admin/products/${encodeURIComponent(product.id)}`);
       const data = await res.json();
-      if (res.ok && data.variants) {
-        const v30 = data.variants.find((v: ProductVariantItem) => v.sizeMl === 30);
-        const v50 = data.variants.find((v: ProductVariantItem) => v.sizeMl === 50);
-        const v100 = data.variants.find((v: ProductVariantItem) => v.sizeMl === 100);
+      if (res.ok) {
+        if (data.product) {
+          const fresh = data.product as ProductItem;
+          setActiveProduct(fresh);
+          setFormName(fresh.name);
+          setFormDescription(fresh.description || "");
+          setFormProductTypeId(fresh.productTypeId || "perfume-spray");
+          setFormCategory(fresh.category || "Perfume Spray");
+          setFormStatus(fresh.status);
+          setNotesEnabled(fresh.notesEnabled ?? true);
+          setFormGender(fresh.gender || "Unisex");
+          setFormConcentration(fresh.concentration || "Eau de Parfum");
+          setFormFeatured(fresh.featured || false);
+          setFormBestseller(fresh.bestseller || false);
 
-        setVariant30Stock(v30?.stockQuantity ?? 0);
-        setVariant30Price(v30?.priceInr ?? STANDARD_PRICES[30]);
-        setVariant30Active(v30 ? v30.status === "ACTIVE" : true);
-
-        setVariant50Stock(v50?.stockQuantity ?? 0);
-        setVariant50Price(v50?.priceInr ?? STANDARD_PRICES[50]);
-        setVariant50Active(v50 ? v50.status === "ACTIVE" : true);
-
-        setVariant100Stock(v100?.stockQuantity ?? 0);
-        setVariant100Price(v100?.priceInr ?? STANDARD_PRICES[100]);
-        setVariant100Active(v100 ? v100.status === "ACTIVE" : true);
+          setMainImageKey(fresh.mainImageKey || fresh.imageKey || "");
+          setMainImageAlt(fresh.mainImageAlt || fresh.imageAlt || "");
+          setGalleryImageKeys(fresh.galleryImageKeys || []);
+          setKeywords(fresh.keywords || []);
+          setNotes(fresh.notes || { top: [], heart: [], base: [] });
+        }
+        if (data.variants && Array.isArray(data.variants)) {
+          const activeVariants = data.variants
+            .filter((v: ProductVariantItem) => v.status !== "ARCHIVED")
+            .map((v: ProductVariantItem, i: number) => ({
+              id: v.id || v.sk.replace("VARIANT#", "") || `v_${i}`,
+              capacity: v.capacity ?? v.sizeMl ?? 30,
+              unit: (v.unit as "ml" | "g" | "pieces" | "units" | "oz") || "ml",
+              label: v.label || `${v.capacity ?? v.sizeMl} ${v.unit || "ml"}`,
+              priceInr: v.priceInr,
+              mrpInr: v.mrpInr,
+              stockQuantity: v.stockQuantity ?? 0,
+              sku: v.sku,
+              status: (v.status === "ACTIVE" ? "ACTIVE" : "INACTIVE") as "ACTIVE" | "INACTIVE",
+            }));
+          if (activeVariants.length > 0) {
+            setVariantsList(activeVariants);
+          }
+        }
       }
     } catch {
-      setVariant30Stock(0);
-      setVariant30Price(STANDARD_PRICES[30]);
-      setVariant30Active(true);
-      setVariant50Stock(0);
-      setVariant50Price(STANDARD_PRICES[50]);
-      setVariant50Active(true);
-      setVariant100Stock(0);
-      setVariant100Price(STANDARD_PRICES[100]);
-      setVariant100Active(true);
+      // Keep initial variants
     }
 
     setIsModalOpen(true);
@@ -426,6 +501,81 @@ export function ProductManager({
     setFormName(val);
     if (modalMode === "CREATE") {
       setFormId(slugify(val));
+    }
+  };
+
+  const addVariantRow = () => {
+    const selectedType = productTypes.find((t) => t.id === formProductTypeId);
+    const unit = (selectedType?.defaultUnit as "ml" | "g" | "pieces" | "units" | "oz") || "ml";
+    const capacity = unit === "ml" ? 50 : 1;
+    const newVariant = {
+      id: `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      capacity,
+      unit,
+      label: `${capacity} ${unit}`,
+      priceInr: 500,
+      stockQuantity: 0,
+      sku: `LUF-${(formId || "ITEM").toUpperCase()}-${capacity}${unit.toUpperCase()}`,
+      status: "ACTIVE" as const,
+    };
+    setVariantsList((prev) => [...prev, newVariant]);
+  };
+
+  const updateVariantRow = (id: string, field: string, value: string | number | boolean) => {
+    setVariantsList((prev) =>
+      prev.map((v) => {
+        if (v.id !== id) return v;
+        const updated = { ...v, [field]: value };
+        if (field === "capacity" || field === "unit") {
+          updated.label = `${updated.capacity} ${updated.unit}`;
+          if (!v.sku || v.sku.startsWith("LUF-")) {
+            updated.sku = `LUF-${(formId || "ITEM").toUpperCase()}-${updated.capacity}${String(updated.unit).toUpperCase()}`;
+          }
+        }
+        return updated;
+      }),
+    );
+  };
+
+  const removeVariantRow = (id: string) => {
+    if (variantsList.length <= 1) {
+      setErrorMessage("A product must have at least one variant.");
+      return;
+    }
+    setVariantsList((prev) => prev.filter((v) => v.id !== id));
+  };
+
+  const handleCreateProductType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTypeName.trim()) return;
+    setNewTypeSubmitting(true);
+    try {
+      const typeId = slugify(newTypeName);
+      const res = await fetch("/api/admin/product-types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: typeId,
+          name: newTypeName.trim(),
+          defaultUnit: newTypeUnit,
+          hasNotes: newTypeHasNotes,
+          status: "ACTIVE",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || "Failed to create product type");
+
+      setProductTypes((prev) => [...prev, data.item]);
+      setFormProductTypeId(data.item.id);
+      setFormCategory(data.item.name);
+      setNotesEnabled(data.item.hasNotes);
+      setIsNewTypeModalOpen(false);
+      setNewTypeName("");
+      setSuccessMessage(`Product type "${data.item.name}" created.`);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Error creating product type");
+    } finally {
+      setNewTypeSubmitting(false);
     }
   };
 
@@ -441,26 +591,18 @@ export function ProductManager({
       base: notes.base.filter((n) => n.name.trim() !== ""),
     };
 
-    const variantsPayload = [
-      {
-        sizeMl: 30 as BottleSizeMl,
-        priceInr: Number(variant30Price),
-        stockQuantity: Math.max(0, Number(variant30Stock) || 0),
-        status: variant30Active ? ("ACTIVE" as const) : ("INACTIVE" as const),
-      },
-      {
-        sizeMl: 50 as BottleSizeMl,
-        priceInr: Number(variant50Price),
-        stockQuantity: Math.max(0, Number(variant50Stock) || 0),
-        status: variant50Active ? ("ACTIVE" as const) : ("INACTIVE" as const),
-      },
-      {
-        sizeMl: 100 as BottleSizeMl,
-        priceInr: Number(variant100Price),
-        stockQuantity: Math.max(0, Number(variant100Stock) || 0),
-        status: variant100Active ? ("ACTIVE" as const) : ("INACTIVE" as const),
-      },
-    ];
+    const variantsPayload = variantsList.map((v, idx) => ({
+      id: v.id,
+      capacity: Number(v.capacity) || 1,
+      unit: v.unit,
+      label: v.label || `${v.capacity} ${v.unit}`,
+      priceInr: Number(v.priceInr) || 1,
+      mrpInr: v.mrpInr ? Number(v.mrpInr) : undefined,
+      stockQuantity: Math.max(0, Number(v.stockQuantity) || 0),
+      sku: v.sku || `LUF-${formId.toUpperCase()}-${v.capacity}${v.unit.toUpperCase()}`,
+      status: v.status,
+      sortOrder: idx,
+    }));
 
     try {
       if (modalMode === "CREATE") {
@@ -468,9 +610,12 @@ export function ProductManager({
           id: formId.trim(),
           name: formName.trim(),
           description: formDescription.trim() || undefined,
+          productTypeId: formProductTypeId,
+          productTypeName: formCategory,
           category: formCategory.trim() || "Perfume",
           status: formStatus,
-          sizes: [30, 50, 100] as BottleSizeMl[],
+          notesEnabled,
+          sizes: variantsList.map((v) => v.capacity),
           mainImageKey: mainImageKey || undefined,
           mainImageAlt: mainImageAlt || undefined,
           galleryImageKeys,
@@ -502,9 +647,12 @@ export function ProductManager({
           version: activeProduct.version,
           name: formName.trim(),
           description: formDescription.trim() || null,
+          productTypeId: formProductTypeId,
+          productTypeName: formCategory,
           category: formCategory.trim() || "Perfume",
           status: formStatus,
-          sizes: [30, 50, 100] as BottleSizeMl[],
+          notesEnabled,
+          sizes: variantsList.map((v) => v.capacity),
           mainImageKey: mainImageKey || null,
           mainImageAlt: mainImageAlt || null,
           galleryImageKeys,
@@ -953,14 +1101,36 @@ export function ProductManager({
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[#292D27]">Category</label>
-                    <input
-                      type="text"
-                      value={formCategory}
-                      onChange={(e) => setFormCategory(e.target.value)}
-                      placeholder="Perfume"
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-[#292D27]">Product Type *</label>
+                      <button
+                        type="button"
+                        onClick={() => setIsNewTypeModalOpen(true)}
+                        className="text-[11px] font-medium text-[#8C6D37] hover:underline inline-flex items-center gap-0.5"
+                      >
+                        <Plus className="size-3" />
+                        <span>Add Type</span>
+                      </button>
+                    </div>
+                    <select
+                      value={formProductTypeId}
+                      onChange={(e) => {
+                        const typeId = e.target.value;
+                        setFormProductTypeId(typeId);
+                        const selected = productTypes.find((t) => t.id === typeId);
+                        if (selected) {
+                          setFormCategory(selected.name);
+                          setNotesEnabled(selected.hasNotes);
+                        }
+                      }}
                       className="mt-1 w-full rounded-lg border border-[#E8E4DA] bg-[#FFFDF8] px-3 py-2 text-xs text-[#171717] focus:border-[#C6A76A] focus:outline-none"
-                    />
+                    >
+                      {productTypes.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.defaultUnit}){t.status === "INACTIVE" ? " [Inactive]" : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -1073,17 +1243,21 @@ export function ProductManager({
 
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2">
-                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#E8E4DA] bg-white px-3 py-1.5 text-xs font-medium text-[#292D27] shadow-sm hover:bg-[#F8F5EC]">
+                        <label
+                          htmlFor="main-product-file-input"
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#E8E4DA] bg-white px-3 py-1.5 text-xs font-medium text-[#292D27] shadow-sm hover:bg-[#F8F5EC]"
+                        >
                           <Upload className="h-3.5 w-3.5 text-[#C6A76A]" />
                           <span>{mainImageKey ? "Replace Main Image" : "Upload Main Image"}</span>
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={handleMainImageUpload}
-                            className="hidden"
-                            disabled={mainUploading}
-                          />
                         </label>
+                        <input
+                          id="main-product-file-input"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleMainImageUpload}
+                          className="sr-only"
+                          disabled={mainUploading}
+                        />
                         {mainImageKey && (
                           <span className="font-mono text-[10px] text-[#78716C] truncate max-w-xs">{mainImageKey}</span>
                         )}
@@ -1106,18 +1280,24 @@ export function ProductManager({
                       <div className="text-xs font-semibold text-[#171717]">Product Gallery Images</div>
                       <div className="text-[11px] text-[#78716C]">Additional photographs for the product gallery carousel</div>
                     </div>
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#E8E4DA] bg-white px-3 py-1.5 text-xs font-medium text-[#292D27] shadow-sm hover:bg-[#F8F5EC]">
-                      <Upload className="h-3.5 w-3.5 text-[#C6A76A]" />
-                      <span>{galleryUploading ? "Uploading..." : "+ Add Gallery Image(s)"}</span>
+                    <div>
+                      <label
+                        htmlFor="gallery-product-file-input"
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#E8E4DA] bg-white px-3 py-1.5 text-xs font-medium text-[#292D27] shadow-sm hover:bg-[#F8F5EC]"
+                      >
+                        <Upload className="h-3.5 w-3.5 text-[#C6A76A]" />
+                        <span>{galleryUploading ? "Uploading..." : "+ Add Gallery Image(s)"}</span>
+                      </label>
                       <input
+                        id="gallery-product-file-input"
                         type="file"
                         multiple
                         accept="image/jpeg,image/png,image/webp"
                         onChange={handleGalleryUpload}
-                        className="hidden"
+                        className="sr-only"
                         disabled={galleryUploading}
                       />
-                    </label>
+                    </div>
                   </div>
 
                   {galleryImageKeys.length > 0 ? (
@@ -1228,13 +1408,29 @@ export function ProductManager({
               {/* Section 4: Fragrance Notes (Top, Heart, Base with Individual Images) */}
               <div className="space-y-4 border-t border-[#E8E4DA] pt-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#8C6D37]">
-                    4. Fragrance Notes (Top, Heart, Base)
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#8C6D37]">
+                      4. Fragrance Notes Pyramid
+                    </h3>
+                    <label className="flex items-center gap-1.5 text-xs text-[#57534E] cursor-pointer rounded border border-[#E8E4DA] bg-white px-2 py-0.5">
+                      <input
+                        type="checkbox"
+                        checked={notesEnabled}
+                        onChange={(e) => setNotesEnabled(e.target.checked)}
+                        className="rounded border-[#E8E4DA] text-[#C6A76A]"
+                      />
+                      <span>Enable Notes</span>
+                    </label>
+                  </div>
                   <span className="text-[11px] text-[#78716C]">Each note carries its OWN individual image</span>
                 </div>
 
-                {(["top", "heart", "base"] as const).map((tier) => {
+                {!notesEnabled ? (
+                  <div className="rounded-xl border border-dashed border-[#E8E4DA] bg-[#FFFDF8] p-4 text-center text-xs text-[#78716C]">
+                    Fragrance notes are disabled for this product. Check &quot;Enable Notes&quot; above to configure Top, Heart and Base notes.
+                  </div>
+                ) : (
+                  (["top", "heart", "base"] as const).map((tier) => {
                   const title =
                     tier === "top"
                       ? "Top Notes (Opening Impression)"
@@ -1295,21 +1491,25 @@ export function ProductManager({
                                 </div>
 
                                 <div>
-                                  <label className="inline-flex cursor-pointer items-center gap-1 text-[10px] font-medium text-[#8C6D37] hover:underline">
+                                  <label
+                                    htmlFor={`note-file-${note.id}`}
+                                    className="inline-flex cursor-pointer items-center gap-1 text-[10px] font-medium text-[#8C6D37] hover:underline"
+                                  >
                                     <Upload className="h-2.5 w-2.5" />
                                     <span>{note.imageKey ? "Replace Note Image" : "Upload Image"}</span>
-                                    <input
-                                      type="file"
-                                      accept="image/jpeg,image/png,image/webp"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleNoteImageUpload(tier, note.id, file);
-                                        e.target.value = "";
-                                      }}
-                                      className="hidden"
-                                      disabled={noteUploadingId === note.id}
-                                    />
                                   </label>
+                                  <input
+                                    id={`note-file-${note.id}`}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleNoteImageUpload(tier, note.id, file);
+                                      e.target.value = "";
+                                    }}
+                                    className="sr-only"
+                                    disabled={noteUploadingId === note.id}
+                                  />
                                   {note.imageKey && (
                                     <button
                                       type="button"
@@ -1361,105 +1561,125 @@ export function ProductManager({
                       )}
                     </div>
                   );
-                })}
+                }))}
               </div>
 
-              {/* Section 5: Variants Section */}
+              {/* Section 5: Dynamic Variants & Inventory */}
               <div className="space-y-3 border-t border-[#E8E4DA] pt-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#8C6D37]">
-                    5. Bottle Variants & Inventory
-                  </h3>
-                  <span className="text-[11px] text-[#78716C]">Confirmed Standard Prices</span>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#8C6D37]">
+                      5. Variants, Capacities & Inventory
+                    </h3>
+                    <p className="text-[11px] text-[#78716C]">
+                      Manage custom capacities, units (ml, g, pieces), prices and stock.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addVariantRow}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#C6A76A] bg-[#FFFDF8] px-2.5 py-1 text-xs font-semibold text-[#8C6D37] hover:bg-[#F5F0E6] transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add Variant</span>
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {/* 30 ml */}
-                  <div className="rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-3">
-                    <div className="flex items-center justify-between font-semibold text-[#171717]">
-                      <span>30 ml Spray</span>
-                      <span className="text-[#8C6D37]">₹{variant30Price}</span>
-                    </div>
-                    <div className="mt-2 space-y-2">
-                      <div>
-                        <label className="text-[11px] text-[#78716C]">Stock Quantity</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={variant30Stock}
-                          onChange={(e) => setVariant30Stock(Number(e.target.value))}
-                          className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717]"
-                        />
-                      </div>
-                      <label className="flex items-center gap-1.5 text-[11px] text-[#57534E] cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={variant30Active}
-                          onChange={(e) => setVariant30Active(e.target.checked)}
-                          className="rounded border-[#E8E4DA] text-[#C6A76A]"
-                        />
-                        <span>Active</span>
-                      </label>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  {variantsList.map((variant) => (
+                    <div
+                      key={variant.id}
+                      className="flex flex-col gap-2 rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-5">
+                        {/* Capacity */}
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-[#78716C]">Capacity / Size</label>
+                          <input
+                            type="number"
+                            min={0.1}
+                            step="any"
+                            value={variant.capacity}
+                            onChange={(e) => updateVariantRow(variant.id, "capacity", Number(e.target.value))}
+                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs font-semibold text-[#171717]"
+                          />
+                        </div>
 
-                  {/* 50 ml */}
-                  <div className="rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-3">
-                    <div className="flex items-center justify-between font-semibold text-[#171717]">
-                      <span>50 ml Spray</span>
-                      <span className="text-[#8C6D37]">₹{variant50Price}</span>
-                    </div>
-                    <div className="mt-2 space-y-2">
-                      <div>
-                        <label className="text-[11px] text-[#78716C]">Stock Quantity</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={variant50Stock}
-                          onChange={(e) => setVariant50Stock(Number(e.target.value))}
-                          className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717]"
-                        />
-                      </div>
-                      <label className="flex items-center gap-1.5 text-[11px] text-[#57534E] cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={variant50Active}
-                          onChange={(e) => setVariant50Active(e.target.checked)}
-                          className="rounded border-[#E8E4DA] text-[#C6A76A]"
-                        />
-                        <span>Active</span>
-                      </label>
-                    </div>
-                  </div>
+                        {/* Unit */}
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-[#78716C]">Unit</label>
+                          <select
+                            value={variant.unit}
+                            onChange={(e) => updateVariantRow(variant.id, "unit", e.target.value)}
+                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717]"
+                          >
+                            <option value="ml">ml</option>
+                            <option value="g">g</option>
+                            <option value="pieces">pieces</option>
+                            <option value="units">units</option>
+                            <option value="oz">oz</option>
+                          </select>
+                        </div>
 
-                  {/* 100 ml */}
-                  <div className="rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-3">
-                    <div className="flex items-center justify-between font-semibold text-[#171717]">
-                      <span>100 ml Spray</span>
-                      <span className="text-[#8C6D37]">₹{variant100Price}</span>
-                    </div>
-                    <div className="mt-2 space-y-2">
-                      <div>
-                        <label className="text-[11px] text-[#78716C]">Stock Quantity</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={variant100Stock}
-                          onChange={(e) => setVariant100Stock(Number(e.target.value))}
-                          className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717]"
-                        />
+                        {/* Price INR */}
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-[#78716C]">Price (₹)</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={variant.priceInr}
+                            onChange={(e) => updateVariantRow(variant.id, "priceInr", Number(e.target.value))}
+                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs font-semibold text-[#8C6D37]"
+                          />
+                        </div>
+
+                        {/* Stock */}
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-[#78716C]">Stock Qty</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={variant.stockQuantity}
+                            onChange={(e) => updateVariantRow(variant.id, "stockQuantity", Math.max(0, Number(e.target.value)))}
+                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717]"
+                          />
+                        </div>
+
+                        {/* SKU */}
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className="text-[10px] uppercase font-bold text-[#78716C]">SKU Code</label>
+                          <input
+                            type="text"
+                            value={variant.sku}
+                            onChange={(e) => updateVariantRow(variant.id, "sku", e.target.value)}
+                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 font-mono text-[11px] text-[#171717]"
+                          />
+                        </div>
                       </div>
-                      <label className="flex items-center gap-1.5 text-[11px] text-[#57534E] cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={variant100Active}
-                          onChange={(e) => setVariant100Active(e.target.checked)}
-                          className="rounded border-[#E8E4DA] text-[#C6A76A]"
-                        />
-                        <span>Active</span>
-                      </label>
+
+                      {/* Status Toggle & Remove */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 border-t border-[#E8E4DA] sm:border-0 pt-2 sm:pt-0">
+                        <label className="flex items-center gap-1 text-[11px] text-[#57534E] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={variant.status === "ACTIVE"}
+                            onChange={(e) => updateVariantRow(variant.id, "status", e.target.checked ? "ACTIVE" : "INACTIVE")}
+                            className="rounded border-[#E8E4DA] text-[#C6A76A]"
+                          />
+                          <span>Active</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeVariantRow(variant.id)}
+                          disabled={variantsList.length <= 1}
+                          className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title={variantsList.length <= 1 ? "At least one variant required" : "Remove variant (will be safely archived on save)"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -1483,6 +1703,79 @@ export function ProductManager({
                     <Check className="h-3.5 w-3.5 text-[#C6A76A]" />
                   )}
                   {modalMode === "CREATE" ? "Create Fragrance" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: Add New Product Type */}
+      {isNewTypeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-[#E8E4DA] bg-[#FFFDF8] p-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#E8E4DA] pb-3">
+              <h3 className="font-serif text-lg font-bold text-[#171717]">Add New Product Type</h3>
+              <button
+                type="button"
+                onClick={() => setIsNewTypeModalOpen(false)}
+                className="rounded-full p-1 text-[#78716C] hover:bg-stone-200 hover:text-black"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateProductType} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#171717]">Type Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Car Diffuser, Wax Melt, Body Mist"
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-[#E8E4DA] bg-white px-3 py-2 text-xs text-[#171717] focus:border-[#C6A76A] focus:outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#171717]">Default Unit</label>
+                  <select
+                    value={newTypeUnit}
+                    onChange={(e) => setNewTypeUnit(e.target.value as "ml" | "g" | "pieces" | "units" | "oz")}
+                    className="mt-1 w-full rounded-lg border border-[#E8E4DA] bg-white px-3 py-2 text-xs text-[#171717]"
+                  >
+                    <option value="ml">ml (Milliliters)</option>
+                    <option value="g">g (Grams)</option>
+                    <option value="pieces">pieces</option>
+                    <option value="units">units</option>
+                    <option value="oz">oz (Ounces)</option>
+                  </select>
+                </div>
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-1.5 text-xs text-[#57534E] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newTypeHasNotes}
+                      onChange={(e) => setNewTypeHasNotes(e.target.checked)}
+                      className="rounded border-[#E8E4DA] text-[#C6A76A]"
+                    />
+                    <span>Has Fragrance Notes</span>
+                  </label>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-[#E8E4DA] pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsNewTypeModalOpen(false)}
+                  className="rounded-lg border border-[#E8E4DA] px-3 py-1.5 text-xs font-medium text-[#78716C] hover:bg-stone-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={newTypeSubmitting}
+                  className="rounded-lg bg-[#C6A76A] px-4 py-1.5 text-xs font-semibold text-[#171717] hover:bg-[#B39356] disabled:opacity-50"
+                >
+                  {newTypeSubmitting ? "Creating..." : "Create Type"}
                 </button>
               </div>
             </form>

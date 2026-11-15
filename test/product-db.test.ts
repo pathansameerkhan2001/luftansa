@@ -74,11 +74,11 @@ console.log("2. Testing Schemas & Confirmed Standard Pricing...");
   assert.equal(parsedCreate.id, "daily-rizz");
   assert.deepEqual(parsedCreate.sizes, [30, 50, 100]);
 
-  // Invalid sizes must be rejected
+  // Invalid empty sizes must be rejected
   assert.throws(() => {
     productCreateInputSchema.parse({
       ...validProductInput,
-      sizes: [20, 50], // 20 is not a confirmed size
+      sizes: [] as unknown as [number, ...number[]],
     });
   });
 

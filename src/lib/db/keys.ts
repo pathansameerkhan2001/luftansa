@@ -17,6 +17,7 @@
 
 export const ENTITY = {
   product: "PRODUCT",
+  productType: "PRODUCT_TYPE",
   variant: "VARIANT",
   stock: "STOCK",
   order: "ORDER",
@@ -53,9 +54,18 @@ export const keys = {
   product: (id: string): ItemKey => ({ pk: `PRODUCT#${assertId(id)}`, sk: "META" }),
   productGsi1: (status: string, id: string) => ({ GSI1PK: "PRODUCTS" as const, GSI1SK: `STATUS#${status}#SLUG#${assertId(id)}` }),
   productGsi2: (category: string, id: string) => ({ GSI2PK: `CATEGORY#${category}`, GSI2SK: `SLUG#${assertId(id)}` }),
-  variant: (productId: string, sizeMl: number): ItemKey => {
-    if (!Number.isInteger(sizeMl) || sizeMl <= 0 || sizeMl > 10000) throw new InvalidKeyError("Invalid size");
-    return { pk: `PRODUCT#${assertId(productId)}`, sk: `VARIANT#${String(sizeMl).padStart(5, "0")}` };
+  productType: (id: string): ItemKey => ({ pk: "PRODUCT_TYPES", sk: `TYPE#${assertId(id)}` }),
+  variant: (productId: string, variantKeyOrSize: string | number): ItemKey => {
+    let suffix: string;
+    if (typeof variantKeyOrSize === "number") {
+      if (!Number.isInteger(variantKeyOrSize) || variantKeyOrSize <= 0 || variantKeyOrSize > 10000) {
+        throw new InvalidKeyError("Invalid size");
+      }
+      suffix = String(variantKeyOrSize).padStart(5, "0");
+    } else {
+      suffix = assertId(variantKeyOrSize, "variantKey");
+    }
+    return { pk: `PRODUCT#${assertId(productId)}`, sk: `VARIANT#${suffix}` };
   },
   stockEntry: (productId: string, at: Date, uid: string): ItemKey => ({
     pk: `PRODUCT#${assertId(productId)}`,
@@ -77,6 +87,7 @@ export const keys = {
 
 /** Prefixes for sort-key range queries within a partition. */
 export const SK_PREFIX = {
+  productType: "TYPE#",
   variant: "VARIANT#",
   stock: "STOCK#",
   orderItem: "ITEM#",

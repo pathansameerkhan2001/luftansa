@@ -16,3 +16,9 @@ await jiti.import("./product-db.test.ts");
 
 console.log("\nLoading storefront-bridge.test.ts via jiti...");
 await jiti.import("./storefront-bridge.test.ts");
+
+console.log("\nLoading upload-workflow.test.ts via jiti...");
+await jiti.import("./upload-workflow.test.ts");
+
+console.log("\nLoading dynamic-product-management.test.ts via jiti...");
+await jiti.import("./dynamic-product-management.test.ts");

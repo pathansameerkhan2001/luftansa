@@ -1,50 +1,101 @@
 import "server-only";
 
-import { ENTITY, keys, SK_PREFIX } from "./keys";
-import type { Repository, TransactOperation } from "./repository";
-import { NotFoundError } from "./repository";
-import type { AuditService } from "./audit";
+import { ENTITY, keys, SK_PREFIX, assertId } from "./keys";
+import { Repository, NotFoundError } from "./repository";
+import { AuditService } from "./audit";
 import {
-  type BottleSizeMl,
   type ProductCreateInput,
   type ProductItem,
   type ProductStatus,
   type ProductUpdateInput,
   type ProductVariantItem,
-  auditEntrySchema,
   productCreateInputSchema,
   productItemSchema,
   productUpdateInputSchema,
   productVariantItemSchema,
+  auditEntrySchema,
   STANDARD_PRICES_INR,
 } from "./schemas";
+import type { TransactOperation } from "./repository";
 
 export interface ProductWithVariants {
   product: ProductItem;
   variants: ProductVariantItem[];
 }
 
-/**
- * Lists products using GSI1 (zero DynamoDB table scans).
- */
-export async function listProducts(
-  repo: Repository,
-  options: {
-    status?: ProductStatus;
-    limit?: number;
-    cursor?: string;
-  } = {},
-): Promise<{ items: ProductItem[]; cursor?: string }> {
-  return repo.queryIndex("GSI1", "GSI1PK", "PRODUCTS", productItemSchema, {
-    sortKeyName: "GSI1SK",
-    sortKeyPrefix: options.status ? `STATUS#${options.status}` : undefined,
-    limit: options.limit ?? 50,
-    cursor: options.cursor,
-  });
+export interface ListProductsOptions {
+  status?: ProductStatus;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface ListProductsResult {
+  items: ProductItem[];
+  cursor?: string;
+}
+
+function normalizeVariant(v: ProductVariantItem): ProductVariantItem {
+  const capacity = v.capacity ?? v.sizeMl ?? 30;
+  const unit = v.unit ?? "ml";
+  const id = v.id ?? (v.sizeMl ? String(v.sizeMl).padStart(5, "0") : v.sk.replace("VARIANT#", ""));
+  const label = v.label ?? `${capacity} ${unit}`;
+  return {
+    ...v,
+    id,
+    capacity,
+    unit,
+    label,
+    sizeMl: v.sizeMl ?? (unit === "ml" ? capacity : undefined),
+    status: v.status ?? "ACTIVE",
+    sortOrder: v.sortOrder ?? 0,
+  };
+}
+
+function normalizeProduct(p: ProductItem): ProductItem {
+  return {
+    ...p,
+    productTypeId: p.productTypeId ?? "perfume-spray",
+    productTypeName: p.productTypeName ?? p.category ?? "Perfume",
+    notesEnabled: p.notesEnabled ?? true,
+    galleryImageKeys: p.galleryImageKeys ?? [],
+    keywords: p.keywords ?? [],
+    notes: p.notes ?? { top: [], heart: [], base: [] },
+  };
 }
 
 /**
- * Fetches a single product and its variants by product ID (slug).
+ * Lists products using GSI1 for zero-scan pagination.
+ * If status is provided, queries STATUS#<status>#.
+ * Otherwise queries all products under GSI1PK = "PRODUCTS".
+ */
+export async function listProducts(
+  repo: Repository,
+  options: ListProductsOptions = {},
+): Promise<ListProductsResult> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
+  const skPrefix = options.status ? `STATUS#${options.status}#` : undefined;
+
+  const result = await repo.queryIndex(
+    "GSI1",
+    "GSI1PK",
+    "PRODUCTS",
+    productItemSchema,
+    {
+      sortKeyPrefix: skPrefix,
+      limit,
+      cursor: options.cursor,
+    },
+  );
+
+  return {
+    items: result.items.map(normalizeProduct),
+    cursor: result.cursor,
+  };
+}
+
+/**
+ * Retrieves a single product and all its variants.
+ * Zero table scans: queries base table item and variant partition prefix.
  */
 export async function getProductWithVariants(
   repo: Repository,
@@ -59,13 +110,16 @@ export async function getProductWithVariants(
     { skPrefix: SK_PREFIX.variant },
   );
 
-  return { product, variants };
+  return {
+    product: normalizeProduct(product),
+    variants: variants.map(normalizeVariant),
+  };
 }
 
 /**
- * Creates a new product and initialises its bottle size variants atomically
+ * Creates a new product and initialises its variants atomically
  * with an audit trail entry using DynamoDB TransactWriteItems.
- * Fails atomically if product ID already exists (zero orphan variants or logs).
+ * Supports dynamic variant IDs, custom capacities, units, prices and stock.
  */
 export async function createProduct(
   repo: Repository,
@@ -78,6 +132,7 @@ export async function createProduct(
 
   const mainImageKey = input.mainImageKey ?? input.imageKey;
   const mainImageAlt = input.mainImageAlt ?? input.imageAlt;
+  const category = input.category || input.productTypeName || "Perfume";
 
   const productItem: ProductItem = {
     pk: keys.product(input.id).pk,
@@ -86,9 +141,12 @@ export async function createProduct(
     id: input.id,
     name: input.name,
     description: input.description,
-    category: input.category,
+    productTypeId: input.productTypeId ?? "perfume-spray",
+    productTypeName: input.productTypeName ?? category,
+    category,
     status: input.status,
-    sizes: input.sizes,
+    notesEnabled: input.notesEnabled ?? true,
+    sizes: input.sizes ?? [30, 50, 100],
     imageKey: mainImageKey,
     imageAlt: mainImageAlt,
     mainImageKey,
@@ -102,38 +160,80 @@ export async function createProduct(
     bestseller: input.bestseller ?? false,
     GSI1PK: "PRODUCTS",
     GSI1SK: keys.productGsi1(input.status, input.id).GSI1SK,
-    GSI2PK: keys.productGsi2(input.category, input.id).GSI2PK,
-    GSI2SK: keys.productGsi2(input.category, input.id).GSI2SK,
+    GSI2PK: keys.productGsi2(category, input.id).GSI2PK,
+    GSI2SK: keys.productGsi2(category, input.id).GSI2SK,
     createdAt: now,
     updatedAt: now,
     version: 1,
   };
 
   const variants: ProductVariantItem[] = [];
-  const variantInputMap = new Map((input.variants ?? []).map((v) => [v.sizeMl, v]));
 
-  for (const size of input.sizes) {
-    const vInput = variantInputMap.get(size);
-    const priceInr = vInput?.priceInr ?? STANDARD_PRICES_INR[size];
-    const sku = vInput?.sku ?? `LUF-${input.id.toUpperCase()}-${size}ML`;
+  if (input.variants && input.variants.length > 0) {
+    for (let i = 0; i < input.variants.length; i++) {
+      const vInput = input.variants[i];
+      const capacity = vInput.capacity ?? vInput.sizeMl ?? 30;
+      const unit = vInput.unit ?? "ml";
+      const variantId = vInput.id
+        ? assertId(vInput.id, "variantId")
+        : `v_${Date.now().toString(36)}_${i}_${Math.random().toString(36).slice(2, 6)}`;
+      const label = vInput.label ?? `${capacity} ${unit}`;
+      const priceInr = vInput.priceInr ?? (capacity === 30 ? 400 : capacity === 50 ? 630 : capacity === 100 ? 1000 : 500);
+      const sku = vInput.sku ?? `LUF-${input.id.toUpperCase()}-${String(capacity).replace(/\./g, "_")}${unit.toUpperCase()}`;
 
-    const variantKey = keys.variant(input.id, size);
-    const variantItem: ProductVariantItem = {
-      pk: variantKey.pk,
-      sk: variantKey.sk,
-      entityType: ENTITY.variant,
-      productId: input.id,
-      sizeMl: size,
-      priceInr,
-      mrpInr: vInput?.mrpInr,
-      stockQuantity: vInput?.stockQuantity ?? 0,
-      sku,
-      status: vInput?.status ?? "ACTIVE",
-      createdAt: now,
-      updatedAt: now,
-      version: 1,
-    };
-    variants.push(variantItem);
+      const variantKey = keys.variant(input.id, variantId);
+      const variantItem: ProductVariantItem = {
+        pk: variantKey.pk,
+        sk: variantKey.sk,
+        entityType: ENTITY.variant,
+        productId: input.id,
+        id: variantId,
+        capacity,
+        unit,
+        label,
+        sizeMl: unit === "ml" ? capacity : undefined,
+        priceInr,
+        mrpInr: vInput.mrpInr,
+        stockQuantity: vInput.stockQuantity ?? 0,
+        sku,
+        status: vInput.status ?? "ACTIVE",
+        sortOrder: vInput.sortOrder ?? i,
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+      };
+      variants.push(variantItem);
+    }
+  } else {
+    // Legacy fallback: initialize from sizes array
+    const sizes = (input.sizes && input.sizes.length > 0) ? input.sizes : [30, 50, 100];
+    for (let i = 0; i < sizes.length; i++) {
+      const size = Number(sizes[i]) || 30;
+      const variantId = String(size).padStart(5, "0");
+      const variantKey = keys.variant(input.id, variantId);
+      const priceInr = (STANDARD_PRICES_INR as Record<number, number>)[size] ?? 500;
+      const sku = `LUF-${input.id.toUpperCase()}-${size}ML`;
+      const variantItem: ProductVariantItem = {
+        pk: variantKey.pk,
+        sk: variantKey.sk,
+        entityType: ENTITY.variant,
+        productId: input.id,
+        id: variantId,
+        capacity: size,
+        unit: "ml",
+        label: `${size} ml`,
+        sizeMl: size,
+        priceInr,
+        stockQuantity: 0,
+        sku,
+        status: "ACTIVE",
+        sortOrder: i,
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+      };
+      variants.push(variantItem);
+    }
   }
 
   const auditEntry = audit.buildEntry({
@@ -162,8 +262,9 @@ export async function createProduct(
 }
 
 /**
- * Updates a product metadata item and optionally its variants atomically
- * with an audit trail entry. Enforces optimistic concurrency via version check.
+ * Updates a product metadata item and reconciles variants atomically.
+ * Preserves historical orders by ARCHIVING removed variants instead of hard-deleting them.
+ * Enforces optimistic concurrency via version check.
  */
 export async function updateProduct(
   repo: Repository,
@@ -199,8 +300,11 @@ export async function updateProduct(
     ...existing.product,
     name: input.name ?? existing.product.name,
     description: input.description === null ? undefined : (input.description ?? existing.product.description),
+    productTypeId: input.productTypeId === null ? undefined : (input.productTypeId ?? existing.product.productTypeId),
+    productTypeName: input.productTypeName === null ? undefined : (input.productTypeName ?? existing.product.productTypeName),
     category: nextCategory,
     status: nextStatus,
+    notesEnabled: input.notesEnabled !== undefined ? input.notesEnabled : (existing.product.notesEnabled ?? true),
     sizes: nextSizes,
     imageKey: nextMainImageKey,
     imageAlt: nextMainImageAlt,
@@ -221,28 +325,50 @@ export async function updateProduct(
     version: input.version + 1,
   };
 
-  const existingVariantMap = new Map(existing.variants.map((v) => [v.sizeMl, v]));
+  const existingVariantMap = new Map(
+    existing.variants.map((v) => [
+      v.id ?? (v.sizeMl ? String(v.sizeMl).padStart(5, "0") : v.sk.replace("VARIANT#", "")),
+      v,
+    ]),
+  );
+
+  const seenVariantIds = new Set<string>();
   const updatedVariants: ProductVariantItem[] = [];
   const variantOps: TransactOperation[] = [];
 
   if (input.variants && input.variants.length > 0) {
-    for (const vInput of input.variants) {
-      const existingVariant = existingVariantMap.get(vInput.sizeMl);
-      const variantKey = keys.variant(productId, vInput.sizeMl);
+    for (let i = 0; i < input.variants.length; i++) {
+      const vInput = input.variants[i];
+      const capacity = vInput.capacity ?? vInput.sizeMl ?? 30;
+      const unit = vInput.unit ?? "ml";
+      const variantId = vInput.id
+        ? assertId(vInput.id, "variantId")
+        : `v_${Date.now().toString(36)}_${i}_${Math.random().toString(36).slice(2, 6)}`;
+      seenVariantIds.add(variantId);
+
+      const existingVariant = existingVariantMap.get(variantId);
+      const variantKey = keys.variant(productId, variantId);
 
       if (existingVariant) {
         const nextPrice = vInput.priceInr ?? existingVariant.priceInr;
         const nextStock = vInput.stockQuantity ?? existingVariant.stockQuantity;
         const nextStatus = vInput.status ?? existingVariant.status;
         const nextSku = vInput.sku ?? existingVariant.sku;
+        const nextLabel = vInput.label ?? existingVariant.label ?? `${capacity} ${unit}`;
 
         const replaced: ProductVariantItem = {
           ...existingVariant,
+          id: variantId,
+          capacity,
+          unit,
+          label: nextLabel,
+          sizeMl: unit === "ml" ? capacity : existingVariant.sizeMl,
           priceInr: nextPrice,
           mrpInr: vInput.mrpInr ?? existingVariant.mrpInr,
           stockQuantity: nextStock,
           sku: nextSku,
           status: nextStatus,
+          sortOrder: vInput.sortOrder ?? existingVariant.sortOrder ?? i,
           updatedAt: now,
           version: existingVariant.version + 1,
         };
@@ -255,17 +381,23 @@ export async function updateProduct(
         });
         updatedVariants.push(replaced);
       } else {
+        const sku = vInput.sku ?? `LUF-${productId.toUpperCase()}-${String(capacity).replace(/\./g, "_")}${unit.toUpperCase()}`;
         const created: ProductVariantItem = {
           pk: variantKey.pk,
           sk: variantKey.sk,
           entityType: ENTITY.variant,
           productId,
-          sizeMl: vInput.sizeMl,
-          priceInr: vInput.priceInr ?? STANDARD_PRICES_INR[vInput.sizeMl as BottleSizeMl],
+          id: variantId,
+          capacity,
+          unit,
+          label: vInput.label ?? `${capacity} ${unit}`,
+          sizeMl: unit === "ml" ? capacity : undefined,
+          priceInr: vInput.priceInr ?? (capacity === 30 ? 400 : capacity === 50 ? 630 : capacity === 100 ? 1000 : 500),
           mrpInr: vInput.mrpInr,
           stockQuantity: vInput.stockQuantity ?? 0,
-          sku: vInput.sku ?? `LUF-${productId.toUpperCase()}-${vInput.sizeMl}ML`,
+          sku,
           status: vInput.status ?? "ACTIVE",
+          sortOrder: vInput.sortOrder ?? i,
           createdAt: now,
           updatedAt: now,
           version: 1,
@@ -277,6 +409,28 @@ export async function updateProduct(
           condition: "not_exists",
         });
         updatedVariants.push(created);
+      }
+    }
+
+    // REQUIREMENT 2 & 4: Archive removed variants instead of hard-deleting them!
+    // Preserves historical order references, invoice line items, and SKUs.
+    for (const [existingId, existingV] of existingVariantMap.entries()) {
+      if (!seenVariantIds.has(existingId) && existingV.status !== "ARCHIVED") {
+        const archived: ProductVariantItem = {
+          ...existingV,
+          status: "ARCHIVED",
+          archivedAt: now,
+          updatedAt: now,
+          version: existingV.version + 1,
+        };
+        variantOps.push({
+          type: "put",
+          item: archived,
+          schema: productVariantItemSchema,
+          condition: "exists_version",
+          expectedVersion: existingV.version,
+        });
+        updatedVariants.push(archived);
       }
     }
   } else {
@@ -291,7 +445,7 @@ export async function updateProduct(
     summary: `Updated fragrance ${nextProductItem.name} (version ${nextProductItem.version})`,
   });
 
-  // Atomic transaction: Product update + all variant updates + audit log
+  // Atomic transaction: Product update + all variant updates/archivals + audit log
   await repo.transactWrite([
     {
       type: "put",

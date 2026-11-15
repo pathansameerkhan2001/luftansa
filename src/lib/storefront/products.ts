@@ -26,6 +26,9 @@ export interface UnifiedStorefrontProduct {
   name: string;
   description?: string;
   category: string;
+  productTypeId?: string;
+  productTypeName?: string;
+  hasNotes: boolean;
   sizes: readonly BottleSizeMl[];
   options: readonly ProductOption[];
   mainImage?: { src: string; alt: string; objectPosition?: string };
@@ -70,18 +73,33 @@ function mapDynamoToUnified(
       alt: `${product.name} photograph ${idx + 1}`,
     }));
 
-  // Build options from active variants or standard pricing
-  const variantMap = new Map(variants.map((v) => [v.sizeMl, v]));
-  const options: ProductOption[] = (product.sizes as BottleSizeMl[]).map((size) => {
-    const v = variantMap.get(size);
-    const priceInr = v?.priceInr ?? (size === 30 ? 400 : size === 50 ? 630 : 1000);
-    return {
+  // Build options from ACTIVE variants only (Requirement 4: Prevents archived/inactive variants from appearing on storefront)
+  const activeVariants = variants
+    .filter((v) => v.status === "ACTIVE")
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+  let options: ProductOption[];
+  if (activeVariants.length > 0) {
+    options = activeVariants.map((v) => {
+      const capacity = v.capacity ?? v.sizeMl ?? 30;
+      const unit = v.unit ?? "ml";
+      const label = v.label || `${capacity} ${unit}`;
+      return {
+        id: v.id ?? `${capacity}${unit}`,
+        label,
+        priceInr: v.priceInr,
+        mrpInr: v.mrpInr,
+      };
+    });
+  } else {
+    // Fallback if variants list is unpopulated
+    const sizes = (product.sizes as BottleSizeMl[]) ?? [30, 50, 100];
+    options = sizes.map((size) => ({
       id: `${size}ml`,
       label: `${size} ml`,
-      priceInr,
-      mrpInr: v?.mrpInr,
-    };
-  });
+      priceInr: size === 30 ? 400 : size === 50 ? 630 : 1000,
+    }));
+  }
 
   const mapNotes = (items: FragranceNoteItem[] = []): StorefrontNote[] =>
     items.map((n) => ({
@@ -90,20 +108,30 @@ function mapDynamoToUnified(
       image: n.imageKey ? { src: resolveAssetUrl(n.imageKey)!, alt: n.name } : undefined,
     }));
 
+  const topNotes = mapNotes(product.notes?.top);
+  const heartNotes = mapNotes(product.notes?.heart);
+  const baseNotes = mapNotes(product.notes?.base);
+  const hasNotes =
+    Boolean(product.notesEnabled ?? true) &&
+    (topNotes.length > 0 || heartNotes.length > 0 || baseNotes.length > 0);
+
   return {
     slug: product.id,
     name: product.name,
     description: product.description,
     category: product.category,
-    sizes: product.sizes as BottleSizeMl[],
+    productTypeId: product.productTypeId,
+    productTypeName: product.productTypeName || product.category,
+    hasNotes,
+    sizes: (product.sizes as BottleSizeMl[]) ?? [30, 50, 100],
     options,
     mainImage,
     galleryImages,
     keywords: product.keywords ?? [],
     notes: {
-      top: mapNotes(product.notes?.top),
-      heart: mapNotes(product.notes?.heart),
-      base: mapNotes(product.notes?.base),
+      top: topNotes,
+      heart: heartNotes,
+      base: baseNotes,
     },
     featured: product.featured ?? false,
     bestseller: product.bestseller ?? false,
@@ -146,6 +174,7 @@ function mapHardcodedToUnified(product: HardcodedProduct): UnifiedStorefrontProd
     name: product.name,
     description: product.description ?? profile.description,
     category: product.category ?? "Perfume",
+    hasNotes: true,
     sizes: product.sizes,
     options: sprayOptions(product),
     mainImage,

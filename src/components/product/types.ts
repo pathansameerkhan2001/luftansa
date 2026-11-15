@@ -15,6 +15,7 @@ export interface ProductDetailData {
   perfectFor?: string;
   concentration?: string;
   gender?: string;
+  hasNotes?: boolean;
   options: readonly ProductOption[];
   images: readonly { src: string; alt: string; objectPosition?: string }[];
   keywords?: readonly string[];

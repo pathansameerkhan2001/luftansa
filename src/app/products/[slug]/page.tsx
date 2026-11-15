@@ -43,6 +43,7 @@ function toDetailData(product: UnifiedStorefrontProduct): ProductDetailData {
     description: product.description,
     concentration: product.concentration,
     gender: product.gender,
+    hasNotes: product.hasNotes,
     options: product.options,
     images,
     keywords: product.keywords,

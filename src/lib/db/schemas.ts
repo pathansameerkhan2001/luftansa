@@ -26,7 +26,7 @@ export type BaseItem = z.infer<typeof baseItemSchema>;
 export const auditEntrySchema = baseItemSchema.extend({
   entityType: z.literal(ENTITY.audit),
   actorEmail: z.email().max(254),
-  action: z.string().regex(/^[a-z]+(\.[a-z_]+)+$/, "Use dotted lower-case actions, e.g. product.update"),
+  action: z.string().regex(/^[a-z_]+(\.[a-z_]+)+$/, "Use dotted lower-case actions, e.g. product.update"),
   targetType: z.string().max(32),
   targetId: z.string().max(128).optional(),
   summary: z.string().max(500),
@@ -38,12 +38,55 @@ export const auditInputSchema = auditEntrySchema.pick({ actorEmail: true, action
 export type AuditInput = z.infer<typeof auditInputSchema>;
 
 /* -------------------------------------------------------------------------- */
-/* Phase 2: Product & Variant Schemas                                         */
+/* Phase 2: Product Types, Product & Variant Schemas                          */
 /* -------------------------------------------------------------------------- */
 
 export const PRODUCT_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 export const productStatusSchema = z.enum(PRODUCT_STATUSES);
 export type ProductStatus = z.infer<typeof productStatusSchema>;
+
+export const VARIANT_STATUSES = ["ACTIVE", "INACTIVE", "ARCHIVED"] as const;
+export const variantStatusSchema = z.enum(VARIANT_STATUSES);
+export type VariantStatus = z.infer<typeof variantStatusSchema>;
+
+export const PRODUCT_TYPE_UNITS = ["ml", "g", "pieces", "units", "oz"] as const;
+export const productTypeUnitSchema = z.enum(PRODUCT_TYPE_UNITS);
+export type ProductTypeUnit = z.infer<typeof productTypeUnitSchema>;
+
+/** Product Type stored item (pk: PRODUCT_TYPES, sk: TYPE#<id>) */
+export const productTypeItemSchema = baseItemSchema.extend({
+  entityType: z.literal(ENTITY.productType),
+  id: idSchema, // e.g. "perfume-spray", "roll-on"
+  name: z.string().min(2).max(64),
+  description: z.string().max(300).optional(),
+  defaultUnit: productTypeUnitSchema.default("ml"),
+  hasNotes: z.boolean().default(true),
+  status: productStatusSchema.default("ACTIVE"),
+  sortOrder: z.number().int().default(0),
+});
+export type ProductTypeItem = z.infer<typeof productTypeItemSchema>;
+
+export const productTypeCreateInputSchema = z.object({
+  id: idSchema,
+  name: z.string().min(2).max(64),
+  description: z.string().max(300).optional(),
+  defaultUnit: productTypeUnitSchema.default("ml"),
+  hasNotes: z.boolean().default(true),
+  status: productStatusSchema.default("ACTIVE"),
+  sortOrder: z.number().int().optional().default(0),
+});
+export type ProductTypeCreateInput = z.input<typeof productTypeCreateInputSchema>;
+
+export const productTypeUpdateInputSchema = z.object({
+  version: z.number().int().min(1),
+  name: z.string().min(2).max(64).optional(),
+  description: z.string().max(300).optional().nullable(),
+  defaultUnit: productTypeUnitSchema.optional(),
+  hasNotes: z.boolean().optional(),
+  status: productStatusSchema.optional(),
+  sortOrder: z.number().int().optional(),
+});
+export type ProductTypeUpdateInput = z.input<typeof productTypeUpdateInputSchema>;
 
 export const BOTTLE_SIZES_ML = [30, 50, 100] as const;
 export const bottleSizeSchema = z.union([z.literal(30), z.literal(50), z.literal(100)]);
@@ -61,28 +104,34 @@ export const fragranceNoteItemSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(64),
   imageKey: z.string().max(512).optional(),
-  description: z.string().max(500).optional(),
+  description: z.string().max(300).optional(),
 });
 export type FragranceNoteItem = z.infer<typeof fragranceNoteItemSchema>;
 
-/** Three distinct fragrance note groups: Top, Heart and Base */
+/** Three distinct fragrance note groups: Top, Heart and Base (max 10 each) */
 export const fragranceNotesSchema = z.object({
-  top: z.array(fragranceNoteItemSchema).default([]),
-  heart: z.array(fragranceNoteItemSchema).default([]),
-  base: z.array(fragranceNoteItemSchema).default([]),
+  top: z.array(fragranceNoteItemSchema).max(10).default([]),
+  heart: z.array(fragranceNoteItemSchema).max(10).default([]),
+  base: z.array(fragranceNoteItemSchema).max(10).default([]),
 });
 export type FragranceNotes = z.infer<typeof fragranceNotesSchema>;
 
-/** Product variant stored item (sk: VARIANT#00030) */
+/** Product variant stored item (sk: VARIANT#<variantId>) */
 export const productVariantItemSchema = baseItemSchema.extend({
   entityType: z.literal(ENTITY.variant),
   productId: idSchema,
-  sizeMl: bottleSizeSchema,
-  priceInr: z.number().int().min(1),
-  mrpInr: z.number().int().min(1).optional(),
-  stockQuantity: z.number().int().min(0).default(0),
+  id: z.string().min(1).max(64).optional(), // Stable unique variant ID e.g. "v_k9f2b8x1" or legacy "00030"
+  capacity: z.number().positive().max(10000).optional(),
+  unit: productTypeUnitSchema.default("ml"),
+  label: z.string().max(64).optional(),
+  sizeMl: z.number().optional(), // Legacy fallback for existing data
+  priceInr: z.number().int().min(1).max(10000000),
+  mrpInr: z.number().int().min(1).max(10000000).optional(),
+  stockQuantity: z.number().int().min(0).max(1000000).default(0),
   sku: z.string().min(1).max(64),
-  status: productStatusSchema.default("ACTIVE"),
+  status: variantStatusSchema.default("ACTIVE"),
+  sortOrder: z.number().int().default(0),
+  archivedAt: z.string().optional(),
 });
 export type ProductVariantItem = z.infer<typeof productVariantItemSchema>;
 
@@ -92,15 +141,18 @@ export const productItemSchema = baseItemSchema.extend({
   id: idSchema, // slug e.g. "black-velvet"
   name: z.string().min(1).max(120),
   description: z.string().max(2000).optional(),
+  productTypeId: z.string().max(64).optional(),
+  productTypeName: z.string().max(64).optional(),
   category: z.string().min(1).max(64).default("Perfume"),
   status: productStatusSchema.default("ACTIVE"),
-  sizes: z.array(bottleSizeSchema).min(1),
+  notesEnabled: z.boolean().default(true),
+  sizes: z.array(z.union([bottleSizeSchema, z.number(), z.string()])).min(1).optional().default([30, 50, 100]),
   imageKey: z.string().max(512).optional(),
   imageAlt: z.string().max(256).optional(),
   mainImageKey: z.string().max(512).optional(),
   mainImageAlt: z.string().max(256).optional(),
-  galleryImageKeys: z.array(z.string().max(512)).default([]),
-  keywords: z.array(z.string().min(1).max(64)).default([]),
+  galleryImageKeys: z.array(z.string().max(512)).max(8).default([]),
+  keywords: z.array(z.string().min(1).max(64)).max(30).default([]),
   notes: fragranceNotesSchema.default({ top: [], heart: [], base: [] }),
   concentration: z.string().max(64).optional(),
   gender: z.string().max(32).optional(),
@@ -116,12 +168,17 @@ export type ProductItem = z.infer<typeof productItemSchema>;
 
 /** Input schema for creating / updating variants in API */
 export const variantInputSchema = z.object({
-  sizeMl: bottleSizeSchema,
-  priceInr: z.number().int().min(1).optional(),
-  mrpInr: z.number().int().min(1).optional(),
-  stockQuantity: z.number().int().min(0).default(0),
+  id: z.string().min(1).max(64).optional(),
+  capacity: z.number().positive().max(10000).optional(),
+  unit: productTypeUnitSchema.default("ml"),
+  label: z.string().max(64).optional(),
+  sizeMl: z.number().optional(), // Legacy input compatibility
+  priceInr: z.number().int().min(1).max(10000000).optional(),
+  mrpInr: z.number().int().min(1).max(10000000).optional(),
+  stockQuantity: z.number().int().min(0).max(1000000).default(0),
   sku: z.string().min(1).max(64).optional(),
-  status: productStatusSchema.default("ACTIVE"),
+  status: variantStatusSchema.default("ACTIVE"),
+  sortOrder: z.number().int().optional().default(0),
 });
 export type VariantInput = z.input<typeof variantInputSchema>;
 
@@ -130,21 +187,24 @@ export const productCreateInputSchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(120),
   description: z.string().max(2000).optional(),
+  productTypeId: z.string().max(64).optional(),
+  productTypeName: z.string().max(64).optional(),
   category: z.string().min(1).max(64).default("Perfume"),
   status: productStatusSchema.default("ACTIVE"),
-  sizes: z.array(bottleSizeSchema).min(1).default([30, 50, 100]),
+  notesEnabled: z.boolean().optional().default(true),
+  sizes: z.array(z.union([bottleSizeSchema, z.number(), z.string()])).min(1).optional().default([30, 50, 100]),
   imageKey: z.string().max(512).optional(),
   imageAlt: z.string().max(256).optional(),
   mainImageKey: z.string().max(512).optional(),
   mainImageAlt: z.string().max(256).optional(),
-  galleryImageKeys: z.array(z.string().max(512)).optional().default([]),
-  keywords: z.array(z.string().min(1).max(64)).optional().default([]),
+  galleryImageKeys: z.array(z.string().max(512)).max(8).optional().default([]),
+  keywords: z.array(z.string().min(1).max(64)).max(30).optional().default([]),
   notes: fragranceNotesSchema.optional().default({ top: [], heart: [], base: [] }),
   concentration: z.string().max(64).optional(),
   gender: z.string().max(32).optional(),
   featured: z.boolean().default(false),
   bestseller: z.boolean().default(false),
-  variants: z.array(variantInputSchema).optional(),
+  variants: z.array(variantInputSchema).max(20).optional(),
 });
 export type ProductCreateInput = z.input<typeof productCreateInputSchema>;
 
@@ -153,20 +213,23 @@ export const productUpdateInputSchema = z.object({
   version: z.number().int().min(1),
   name: z.string().min(1).max(120).optional(),
   description: z.string().max(2000).optional().nullable(),
+  productTypeId: z.string().max(64).optional().nullable(),
+  productTypeName: z.string().max(64).optional().nullable(),
   category: z.string().min(1).max(64).optional(),
   status: productStatusSchema.optional(),
-  sizes: z.array(bottleSizeSchema).min(1).optional(),
+  notesEnabled: z.boolean().optional(),
+  sizes: z.array(z.union([bottleSizeSchema, z.number(), z.string()])).min(1).optional(),
   imageKey: z.string().max(512).optional().nullable(),
   imageAlt: z.string().max(256).optional().nullable(),
   mainImageKey: z.string().max(512).optional().nullable(),
   mainImageAlt: z.string().max(256).optional().nullable(),
-  galleryImageKeys: z.array(z.string().max(512)).optional(),
-  keywords: z.array(z.string().min(1).max(64)).optional(),
+  galleryImageKeys: z.array(z.string().max(512)).max(8).optional(),
+  keywords: z.array(z.string().min(1).max(64)).max(30).optional(),
   notes: fragranceNotesSchema.optional(),
   concentration: z.string().max(64).optional().nullable(),
   gender: z.string().max(32).optional().nullable(),
   featured: z.boolean().optional(),
   bestseller: z.boolean().optional(),
-  variants: z.array(variantInputSchema).optional(),
+  variants: z.array(variantInputSchema).max(20).optional(),
 });
 export type ProductUpdateInput = z.input<typeof productUpdateInputSchema>;
