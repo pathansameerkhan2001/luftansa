@@ -3,12 +3,10 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { withAdmin } from "@/lib/auth/require-admin";
 import { getAssetUrl } from "@/lib/assets";
 import { getS3Client, getS3Config, isAllowedAssetKey } from "@/lib/s3";
+import { formatMegabytes, isAllowedImageType, MAX_UPLOAD_BYTES } from "@/lib/media/upload-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /**
  * POST /api/admin/media/upload
@@ -41,12 +39,19 @@ export const POST = withAdmin(async (request: NextRequest) => {
     return NextResponse.json({ error: "invalid_slug", message: "Invalid product slug format" }, { status: 400 });
   }
 
-  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+  if (!isAllowedImageType(file.type)) {
     return NextResponse.json({ error: "invalid_content_type", message: "Only JPEG, PNG and WebP images are allowed" }, { status: 400 });
   }
 
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    return NextResponse.json({ error: "file_too_large", message: "File size exceeds 10 MB limit" }, { status: 400 });
+  // The admin compresses images in the browser to fit this limit before upload.
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      {
+        error: "file_too_large",
+        message: `Image is ${formatMegabytes(file.size)}; the upload limit is ${formatMegabytes(MAX_UPLOAD_BYTES)}.`,
+      },
+      { status: 413 },
+    );
   }
 
   // Clean filename to prevent path traversal
@@ -85,8 +90,11 @@ export const POST = withAdmin(async (request: NextRequest) => {
       sizeBytes: file.size,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "S3 upload failed";
-    console.error("[media/upload] S3 upload error:", message);
-    return NextResponse.json({ error: "s3_upload_failed", message }, { status: 500 });
+    // Log details server-side only; never return raw AWS error text to the browser.
+    console.error("[media/upload] S3 upload error:", key, e instanceof Error ? e.name : "unknown");
+    return NextResponse.json(
+      { error: "s3_upload_failed", message: "The image could not be stored. Please try again." },
+      { status: 502 },
+    );
   }
 });

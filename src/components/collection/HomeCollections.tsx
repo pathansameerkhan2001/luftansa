@@ -1,13 +1,13 @@
 import { getAssetUrl } from "@/lib/assets";
 import { productHref } from "@/lib/routes";
 import {
-  PERSONALITY_COLLECTION_SLUGS,
   ROLL_ON_PRODUCTS,
   rollOnOptions,
   sprayOptions,
   type Product,
   type RollOnProduct,
 } from "@/data/products";
+import { selectPersonality } from "@/lib/storefront/collections";
 import { getActiveStorefrontProducts, toStorefrontCardData } from "@/lib/storefront/products";
 import { CollectionPanel } from "./CollectionPanel";
 import { RollOnBottleIcon } from "./icons";
@@ -55,20 +55,9 @@ function RollOnComingSoon() {
 /** Homepage collections: Personality and Roll On panels (side by side from xl). */
 export async function HomeCollections() {
   const allActive = await getActiveStorefrontProducts();
-  const productMap = new Map(allActive.map((p) => [p.slug, p]));
 
-  // Match PERSONALITY_COLLECTION_SLUGS in order
-  const personality = PERSONALITY_COLLECTION_SLUGS
-    .map((slug) => productMap.get(slug))
-    .filter((p): p is NonNullable<typeof p> => Boolean(p))
-    .map(toStorefrontCardData);
-
-  // Append any additional active products from DynamoDB not in PERSONALITY_COLLECTION_SLUGS
-  for (const p of allActive) {
-    if (!personality.some((item) => item.slug === p.slug)) {
-      personality.push(toStorefrontCardData(p));
-    }
-  }
+  // "personality" members first, then every other active product (existing homepage behaviour).
+  const personality = selectPersonality(allActive).map(toStorefrontCardData);
 
   const rollOns = ROLL_ON_PRODUCTS.map(toRollOnCardData);
 

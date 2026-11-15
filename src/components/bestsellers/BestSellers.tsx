@@ -3,26 +3,15 @@ import { FlourishIcon } from "@/components/collection/icons";
 import { HERO_BANNER } from "@/components/hero/hero-banner";
 import { getAssetUrl } from "@/lib/assets";
 import { productHref } from "@/lib/routes";
-import { BEST_SELLER_SLUGS } from "@/data/products";
 import { FRAGRANCE_PROFILES, getNoteImage } from "@/data/fragrance-profiles";
+import { selectBestSellers } from "@/lib/storefront/collections";
 import { getActiveStorefrontProducts } from "@/lib/storefront/products";
 import { BestSellersShowcase, type BestSellerItem } from "./BestSellersShowcase";
 
 async function buildItems(): Promise<BestSellerItem[]> {
   const allActive = await getActiveStorefrontProducts();
-  const productMap = new Map(allActive.map((p) => [p.slug, p]));
-
-  // Match BEST_SELLER_SLUGS in order
-  const selected = BEST_SELLER_SLUGS
-    .map((slug) => productMap.get(slug))
-    .filter((p): p is NonNullable<typeof p> => Boolean(p));
-
-  // If there are other active products with bestseller: true in DynamoDB, include them:
-  for (const p of allActive) {
-    if (p.bestseller && !selected.some((item) => item.slug === p.slug)) {
-      selected.push(p);
-    }
-  }
+  // Products flagged as bestsellers in the admin, in display order.
+  const selected = selectBestSellers(allActive);
 
   return selected.map((product) => {
     const profile = FRAGRANCE_PROFILES[product.slug] ?? {};

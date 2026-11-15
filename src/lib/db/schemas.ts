@@ -127,13 +127,33 @@ export const productVariantItemSchema = baseItemSchema.extend({
   sizeMl: z.number().optional(), // Legacy fallback for existing data
   priceInr: z.number().int().min(1).max(10000000),
   mrpInr: z.number().int().min(1).max(10000000).optional(),
-  stockQuantity: z.number().int().min(0).max(1000000).default(0),
-  sku: z.string().min(1).max(64),
+  /** Unset = stock not configured yet ("Not set"). 0 is a genuine zero-stock value. */
+  stockQuantity: z.number().int().min(0).max(1000000).optional(),
+  /** Unset = no SKU assigned yet. SKUs are never auto-generated. */
+  sku: z.string().min(1).max(64).optional(),
   status: variantStatusSchema.default("ACTIVE"),
   sortOrder: z.number().int().default(0),
   archivedAt: z.string().optional(),
 });
 export type ProductVariantItem = z.infer<typeof productVariantItemSchema>;
+
+/**
+ * Storefront collections a product is placed in (homepage sections).
+ * Best Sellers membership is the existing `bestseller` flag.
+ */
+export const STOREFRONT_COLLECTIONS = ["signature", "personality"] as const;
+export const storefrontCollectionSchema = z.enum(STOREFRONT_COLLECTIONS);
+export type StorefrontCollection = z.infer<typeof storefrontCollectionSchema>;
+
+/** Content fields that were imported but not yet confirmed by Luftansa. */
+export const VERIFIABLE_FIELDS = ["description", "notes"] as const;
+export const verifiableFieldSchema = z.enum(VERIFIABLE_FIELDS);
+export type VerifiableField = z.infer<typeof verifiableFieldSchema>;
+
+const collectionsSchema = z.array(storefrontCollectionSchema).max(STOREFRONT_COLLECTIONS.length);
+const unverifiedFieldsSchema = z.array(verifiableFieldSchema).max(VERIFIABLE_FIELDS.length);
+/** Storefront display order (ascending). Products without one are listed after ordered ones. */
+const displayOrderSchema = z.number().int().min(0).max(100000);
 
 /** Product metadata stored item (sk: META) */
 export const productItemSchema = baseItemSchema.extend({
@@ -158,6 +178,9 @@ export const productItemSchema = baseItemSchema.extend({
   gender: z.string().max(32).optional(),
   featured: z.boolean().default(false),
   bestseller: z.boolean().default(false),
+  collections: collectionsSchema.optional(),
+  displayOrder: displayOrderSchema.optional(),
+  unverifiedFields: unverifiedFieldsSchema.optional(),
   // GSI keys for scan-free queries
   GSI1PK: z.literal("PRODUCTS"),
   GSI1SK: z.string().min(1).max(256),
@@ -175,8 +198,10 @@ export const variantInputSchema = z.object({
   sizeMl: z.number().optional(), // Legacy input compatibility
   priceInr: z.number().int().min(1).max(10000000).optional(),
   mrpInr: z.number().int().min(1).max(10000000).optional(),
-  stockQuantity: z.number().int().min(0).max(1000000).default(0),
-  sku: z.string().min(1).max(64).optional(),
+  /** null clears the value ("Not set"); omitted keeps the existing value. */
+  stockQuantity: z.number().int().min(0).max(1000000).nullable().optional(),
+  /** null clears the SKU; omitted keeps the existing value. */
+  sku: z.string().trim().min(1).max(64).nullable().optional(),
   status: variantStatusSchema.default("ACTIVE"),
   sortOrder: z.number().int().optional().default(0),
 });
@@ -204,6 +229,9 @@ export const productCreateInputSchema = z.object({
   gender: z.string().max(32).optional(),
   featured: z.boolean().default(false),
   bestseller: z.boolean().default(false),
+  collections: collectionsSchema.optional(),
+  displayOrder: displayOrderSchema.optional(),
+  unverifiedFields: unverifiedFieldsSchema.optional(),
   variants: z.array(variantInputSchema).max(20).optional(),
 });
 export type ProductCreateInput = z.input<typeof productCreateInputSchema>;
@@ -230,6 +258,9 @@ export const productUpdateInputSchema = z.object({
   gender: z.string().max(32).optional().nullable(),
   featured: z.boolean().optional(),
   bestseller: z.boolean().optional(),
+  collections: collectionsSchema.optional(),
+  displayOrder: displayOrderSchema.optional().nullable(),
+  unverifiedFields: unverifiedFieldsSchema.optional(),
   variants: z.array(variantInputSchema).max(20).optional(),
 });
 export type ProductUpdateInput = z.input<typeof productUpdateInputSchema>;

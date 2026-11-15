@@ -1,103 +1,58 @@
 import assert from "node:assert/strict";
 import { PRODUCTS } from "../src/data/products";
+import { buildLegacyCatalogue } from "../src/lib/catalogue/legacy-catalogue";
+import { buildStorefrontCatalogue, fallbackStorefrontCatalogue } from "../src/lib/storefront/products";
 
-interface BridgeTestItem {
-  slug: string;
-  name: string;
-  source: "dynamodb" | "hardcoded";
+console.log("--- Testing Storefront Data Source (DynamoDB single source of truth) ---");
+
+const NOW = "2026-11-15T00:00:00.000Z";
+const { entries } = buildLegacyCatalogue({ now: NOW });
+
+// 1. Products deleted from DynamoDB never reappear from the hardcoded catalogue
+console.log("1. Deleted products do not reappear...");
+{
+  const withoutOud = entries.filter((e) => e.product.id !== "oud-forest");
+  const catalogue = buildStorefrontCatalogue(withoutOud);
+  assert.ok(!catalogue.some((p) => p.slug === "oud-forest"), "Deleted product must not be resurrected from code");
+  assert.equal(catalogue.length, PRODUCTS.length - 1);
+  assert.ok(catalogue.every((p) => p.source === "dynamodb"));
+  console.log("   ✓ Storefront reflects DynamoDB exactly (no hardcoded merge)");
 }
 
-console.log("--- Testing Storefront Bridge Logic (Items 8, 9, 10) ---");
-
-// Test 1: Inactive Product Suppression (Item 9)
-console.log("1. Testing Inactive Product Suppression...");
+// 2. Inactive products are suppressed
+console.log("2. Inactive products are suppressed...");
 {
-  const suppressedSlugs = new Set<string>(["daily-rizz"]);
-  const unifiedMap = new Map<string, BridgeTestItem>();
-
-  // Simulate an active product from DynamoDB
-  unifiedMap.set("custom-perfume", {
-    slug: "custom-perfume",
-    name: "Custom Perfume",
-    source: "dynamodb",
-  });
-
-  // Merge hardcoded catalogue
-  for (const hardcoded of PRODUCTS) {
-    if (suppressedSlugs.has(hardcoded.slug)) {
-      continue; // Must be suppressed!
-    }
-    if (unifiedMap.has(hardcoded.slug)) {
-      continue;
-    }
-    unifiedMap.set(hardcoded.slug, {
-      slug: hardcoded.slug,
-      name: hardcoded.name,
-      source: "hardcoded",
-    });
-  }
-
-  const all = Array.from(unifiedMap.values());
-  assert.ok(
-    !all.some((p) => p.slug === "daily-rizz"),
-    "Suppressed product 'daily-rizz' must NOT appear in storefront output",
+  const catalogue = buildStorefrontCatalogue(
+    entries.map((e) => (e.product.id === "daily-rizz" ? { ...e, product: { ...e.product, status: "INACTIVE" as const } } : e)),
   );
-  assert.ok(
-    all.some((p) => p.slug === "custom-perfume" && p.source === "dynamodb"),
-    "Active DynamoDB product must appear in storefront output",
+  assert.ok(!catalogue.some((p) => p.slug === "daily-rizz"));
+  console.log("   ✓ Inactive suppression verified");
+}
+
+// 3. Admin data is what the storefront shows
+console.log("3. DynamoDB values are rendered as-is...");
+{
+  const catalogue = buildStorefrontCatalogue(
+    entries.map((e) => (e.product.id === "black-velvet" ? { ...e, product: { ...e.product, name: "Black Velvet Royale" } } : e)),
   );
-  console.log("   ✓ Inactive suppression verified: suppressed slugs never leak from hardcoded fallback");
+  assert.equal(catalogue.find((p) => p.slug === "black-velvet")!.name, "Black Velvet Royale");
+  console.log("   ✓ Admin edits flow through unchanged");
 }
 
-// Test 2: Active DynamoDB Product Visibility & Precedence (Item 8)
-console.log("2. Testing Active DynamoDB Product Visibility & Precedence...");
+// 4. An empty DynamoDB catalogue means an empty storefront (no silent merge)
+console.log("4. Empty DynamoDB catalogue is respected...");
 {
-  const suppressedSlugs = new Set<string>();
-  const unifiedMap = new Map<string, BridgeTestItem>();
-
-  // Simulate DynamoDB updating an existing hardcoded product with custom pricing/name
-  unifiedMap.set("black-velvet", {
-    slug: "black-velvet",
-    name: "Black Velvet Royale (DynamoDB Active)",
-    source: "dynamodb",
-  });
-
-  // Merge hardcoded
-  for (const hardcoded of PRODUCTS) {
-    if (suppressedSlugs.has(hardcoded.slug)) continue;
-    if (unifiedMap.has(hardcoded.slug)) continue;
-    unifiedMap.set(hardcoded.slug, {
-      slug: hardcoded.slug,
-      name: hardcoded.name,
-      source: "hardcoded",
-    });
-  }
-
-  const bv = unifiedMap.get("black-velvet");
-  assert.ok(bv);
-  assert.equal(bv.name, "Black Velvet Royale (DynamoDB Active)");
-  assert.equal(bv.source, "dynamodb");
-  console.log("   ✓ Active DynamoDB product takes precedence over hardcoded catalogue");
+  assert.deepEqual(buildStorefrontCatalogue([]), []);
+  console.log("   ✓ No hardcoded products injected");
 }
 
-// Test 3: Hardcoded Catalogue Fallback when DynamoDB is Unavailable (Item 10)
-console.log("3. Testing Hardcoded Fallback when DynamoDB is Unavailable...");
+// 5. Outage fallback (used only when DynamoDB cannot be reached)
+console.log("5. Outage fallback contains the legacy catalogue...");
 {
-  // When DynamoDB throws or returns nothing, map falls back to PRODUCTS
-  const unifiedMap = new Map<string, BridgeTestItem>();
-  for (const hardcoded of PRODUCTS) {
-    unifiedMap.set(hardcoded.slug, {
-      slug: hardcoded.slug,
-      name: hardcoded.name,
-      source: "hardcoded",
-    });
-  }
-
-  assert.equal(unifiedMap.size, PRODUCTS.length);
-  assert.ok(unifiedMap.has("black-velvet"));
-  assert.ok(unifiedMap.has("oud-forest"));
-  assert.ok(unifiedMap.has("nonchalant"));
-  console.log("   ✓ Fallback maintains 100% of hardcoded catalogue without exceptions");
+  const fallback = fallbackStorefrontCatalogue();
+  assert.equal(fallback.length, PRODUCTS.length);
+  assert.ok(fallback.every((p) => p.source === "fallback"));
+  console.log("   ✓ Outage fallback verified");
 }
 
 console.log("\n🎉 STOREFRONT BRIDGE UNIT TESTS PASSED SUCCESSFULLY!");

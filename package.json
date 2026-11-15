@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node test/run-tests.mjs"
+    "test": "node test/run-tests.mjs",
+    "catalogue:import": "node scripts/import-catalogue.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1167.0",

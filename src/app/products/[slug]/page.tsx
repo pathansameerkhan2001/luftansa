@@ -6,18 +6,21 @@ import { ProductPurchase } from "@/components/product/ProductPurchase";
 import { ProductTabs } from "@/components/product/ProductTabs";
 import { TrustBadges } from "@/components/product/TrustBadges";
 import type { ProductDetailData } from "@/components/product/types";
-import { PRODUCTS } from "@/data/products";
 import { STORE_NAME } from "@/data/store";
 import {
   getActiveStorefrontProductBySlug,
+  getActiveStorefrontProducts,
   type UnifiedStorefrontProduct,
 } from "@/lib/storefront/products";
 
-// Allow on-demand server rendering for newly created active DynamoDB products
+// Products added later in the admin are rendered on demand.
 export const dynamicParams = true;
+// Refreshed on demand after admin writes (revalidateStorefront); hourly safety net.
+export const revalidate = 3600;
 
-export function generateStaticParams() {
-  return PRODUCTS.map((p) => ({ slug: p.slug }));
+export async function generateStaticParams() {
+  const products = await getActiveStorefrontProducts();
+  return products.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {

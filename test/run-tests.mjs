@@ -8,6 +8,7 @@ const emptyPath = path.join(__dirname, "empty.js");
 const jiti = createJiti(import.meta.url, {
   alias: {
     "server-only": emptyPath,
+    "@": path.join(__dirname, "..", "src"),
   },
 });
 
@@ -22,3 +23,6 @@ await jiti.import("./upload-workflow.test.ts");
 
 console.log("\nLoading dynamic-product-management.test.ts via jiti...");
 await jiti.import("./dynamic-product-management.test.ts");
+
+console.log("\nLoading catalogue-sync.test.ts via jiti...");
+await jiti.import("./catalogue-sync.test.ts");

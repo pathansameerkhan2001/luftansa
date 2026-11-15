@@ -4,6 +4,7 @@ import { getDataServices } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/db/repository";
 import { deleteProduct, getProductWithVariants, updateProduct } from "@/lib/db/products-service";
 import { productUpdateInputSchema } from "@/lib/db/schemas";
+import { revalidateStorefront } from "@/lib/storefront/revalidate";
 import { ZodError } from "zod";
 
 export const runtime = "nodejs";
@@ -59,6 +60,7 @@ export const PUT = withAdmin<ProductRouteContext>(async (request: NextRequest, c
   try {
     const input = productUpdateInputSchema.parse(body);
     const result = await updateProduct(data.repo, data.audit, context.session.email, id, input);
+    revalidateStorefront(id);
     return NextResponse.json({ ok: true, product: result.product, variants: result.variants });
   } catch (e) {
     if (e instanceof ZodError) {
@@ -111,6 +113,7 @@ export const DELETE = withAdmin<ProductRouteContext>(async (request: NextRequest
 
   try {
     await deleteProduct(data.repo, data.audit, context.session.email, id, version);
+    revalidateStorefront(id);
     return NextResponse.json({ ok: true, deleted: id });
   } catch (e) {
     if (e instanceof NotFoundError) {

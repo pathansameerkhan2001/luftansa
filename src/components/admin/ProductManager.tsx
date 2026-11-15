@@ -22,30 +22,107 @@ import {
   XCircle,
 } from "lucide-react";
 import type {
-  BottleSizeMl,
   FragranceNoteItem,
   FragranceNotes,
   ProductItem,
   ProductVariantItem,
+  StorefrontCollection,
+  VerifiableField,
 } from "@/lib/db/schemas";
+import { compressImageForUpload } from "@/lib/media/compress-image";
+import { formatMegabytes, isAllowedImageType, MAX_SOURCE_BYTES } from "@/lib/media/upload-limits";
 
 interface ProductWithVariantList extends ProductItem {
   variants?: ProductVariantItem[];
 }
 
+type VariantUnit = "ml" | "g" | "pieces" | "units" | "oz";
+
+interface VariantFormRow {
+  id: string;
+  capacity: number;
+  unit: VariantUnit;
+  label: string;
+  priceInr: number;
+  mrpInr?: number;
+  /** null = stock not configured ("Not set"); 0 = genuine zero stock. */
+  stockQuantity: number | null;
+  /** Empty = no SKU assigned ("Not set"). SKUs are never auto-generated. */
+  sku: string;
+  status: "ACTIVE" | "INACTIVE";
+}
+
+const COLLECTION_OPTIONS: { id: StorefrontCollection; label: string }[] = [
+  { id: "signature", label: "Signature Collection" },
+  { id: "personality", label: "Personality Collection" },
+];
+
+const UNVERIFIED_LABEL: Record<VerifiableField, string> = {
+  description: "Description",
+  notes: "Fragrance notes",
+};
+
 interface ProductManagerProps {
-  initialProducts: ProductItem[];
+  initialProducts: ProductWithVariantList[];
+  initialError?: string | null;
   dbConfigured: boolean;
   initialModalOpen?: boolean;
   initialModalMode?: "CREATE" | "EDIT";
   initialActiveProduct?: ProductItem | null;
 }
 
-const STANDARD_PRICES: Record<BottleSizeMl, number> = {
+/** Confirmed standard prices, used only to pre-fill new standard-size variants. */
+const STANDARD_PRICES: Record<number, number> = {
   30: 400,
   50: 630,
   100: 1000,
 };
+
+function standardPrice(capacity: number, unit: VariantUnit): number | undefined {
+  return unit === "ml" ? STANDARD_PRICES[capacity] : undefined;
+}
+
+function toVariantRows(variants: ProductVariantItem[]): VariantFormRow[] {
+  return variants
+    .filter((v) => v.status !== "ARCHIVED")
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    .map((v, i) => ({
+      id: v.id || v.sk.replace("VARIANT#", "") || `v_${i}`,
+      capacity: v.capacity ?? v.sizeMl ?? 30,
+      unit: (v.unit as VariantUnit) || "ml",
+      label: v.label || `${v.capacity ?? v.sizeMl} ${v.unit || "ml"}`,
+      priceInr: v.priceInr,
+      mrpInr: v.mrpInr,
+      stockQuantity: v.stockQuantity ?? null,
+      sku: v.sku ?? "",
+      status: (v.status === "ACTIVE" ? "ACTIVE" : "INACTIVE") as "ACTIVE" | "INACTIVE",
+    }));
+}
+
+function defaultVariantRows(): VariantFormRow[] {
+  const stamp = Date.now().toString(36);
+  return [30, 50, 100].map((ml, i) => ({
+    id: `v_${stamp}_${i + 1}`,
+    capacity: ml,
+    unit: "ml" as const,
+    label: `${ml} ml`,
+    priceInr: STANDARD_PRICES[ml],
+    stockQuantity: null,
+    sku: "",
+    status: "ACTIVE" as const,
+  }));
+}
+
+/** Reads an error message from an API response that may not be JSON (e.g. a platform 413). */
+async function readApiError(res: Response, fallback: string): Promise<string> {
+  if (res.status === 413) return "The image is too large to upload. Please choose a smaller image.";
+  try {
+    const data = (await res.json()) as { message?: string; error?: string };
+    return data.message || data.error || fallback;
+  } catch {
+    return `${fallback} (HTTP ${res.status})`;
+  }
+}
 
 function slugify(name: string): string {
   return name
@@ -66,6 +143,7 @@ function resolveAssetUrl(key: string | undefined): string {
 
 export function ProductManager({
   initialProducts,
+  initialError = null,
   dbConfigured,
   initialModalOpen = false,
   initialModalMode = "CREATE",
@@ -75,7 +153,7 @@ export function ProductManager({
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Modal State
@@ -95,10 +173,16 @@ export function ProductManager({
   const [formCategory, setFormCategory] = useState(initialActiveProduct?.category ?? "Perfume Spray");
   const [formStatus, setFormStatus] = useState<"ACTIVE" | "INACTIVE">(initialActiveProduct?.status ?? "ACTIVE");
   const [notesEnabled, setNotesEnabled] = useState<boolean>(initialActiveProduct?.notesEnabled ?? true);
-  const [formGender, setFormGender] = useState(initialActiveProduct?.gender ?? "Unisex");
-  const [formConcentration, setFormConcentration] = useState(initialActiveProduct?.concentration ?? "Eau de Parfum");
+  // Empty = not set. Never pre-filled with assumed values.
+  const [formGender, setFormGender] = useState(initialActiveProduct?.gender ?? "");
+  const [formConcentration, setFormConcentration] = useState(initialActiveProduct?.concentration ?? "");
   const [formFeatured, setFormFeatured] = useState(initialActiveProduct?.featured ?? false);
   const [formBestseller, setFormBestseller] = useState(initialActiveProduct?.bestseller ?? false);
+  const [formCollections, setFormCollections] = useState<StorefrontCollection[]>(initialActiveProduct?.collections ?? []);
+  const [formDisplayOrder, setFormDisplayOrder] = useState<string>(
+    initialActiveProduct?.displayOrder !== undefined ? String(initialActiveProduct.displayOrder) : "",
+  );
+  const [unverifiedFields, setUnverifiedFields] = useState<VerifiableField[]>(initialActiveProduct?.unverifiedFields ?? []);
 
   // Product Types State
   const [productTypes, setProductTypes] = useState<Array<{
@@ -150,21 +234,7 @@ export function ProductManager({
   );
 
   // Dynamic Variants Form State (Stable unique IDs, capacity, unit, price, stock, SKU)
-  const [variantsList, setVariantsList] = useState<Array<{
-    id: string;
-    capacity: number;
-    unit: "ml" | "g" | "pieces" | "units" | "oz";
-    label: string;
-    priceInr: number;
-    mrpInr?: number;
-    stockQuantity: number;
-    sku: string;
-    status: "ACTIVE" | "INACTIVE";
-  }>>([
-    { id: "00030", capacity: 30, unit: "ml", label: "30 ml", priceInr: 400, stockQuantity: 0, sku: "LUF-30ML", status: "ACTIVE" },
-    { id: "00050", capacity: 50, unit: "ml", label: "50 ml", priceInr: 630, stockQuantity: 0, sku: "LUF-50ML", status: "ACTIVE" },
-    { id: "00100", capacity: 100, unit: "ml", label: "100 ml", priceInr: 1000, stockQuantity: 0, sku: "LUF-100ML", status: "ACTIVE" },
-  ]);
+  const [variantsList, setVariantsList] = useState<VariantFormRow[]>(defaultVariantRows);
 
   // Load product types on mount
   useEffect(() => {
@@ -178,64 +248,41 @@ export function ProductManager({
       .catch(() => {});
   }, []);
 
-  // S3 Upload Helper: Primary same-origin server upload with presigned direct fallback
+  /**
+   * Uploads an image to private S3 through the same-origin admin API.
+   * Images above the upload limit are compressed in the browser first.
+   * (The presigned direct-to-S3 path is not used: the bucket has no CORS rule.)
+   */
   const uploadFileToS3 = async (
     file: File,
     folder: "main" | "gallery" | "notes",
   ): Promise<{ key: string; publicUrl: string }> => {
+    if (!isAllowedImageType(file.type)) {
+      throw new Error(`"${file.name}" is not a JPEG, PNG or WebP image.`);
+    }
+    if (file.size > MAX_SOURCE_BYTES) {
+      throw new Error(`"${file.name}" is ${formatMegabytes(file.size)}; please choose an image under ${formatMegabytes(MAX_SOURCE_BYTES)}.`);
+    }
     const slug = formId.trim() || slugify(formName) || "temp-fragrance";
+    const prepared = await compressImageForUpload(file);
 
-    // 1. Primary Strategy: Same-Origin server upload (bypasses browser-to-S3 CORS preflight)
+    const formData = new FormData();
+    formData.append("file", prepared);
+    formData.append("folder", folder);
+    formData.append("slug", slug);
+
+    let res: Response;
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", folder);
-      formData.append("slug", slug);
-
-      const serverRes = await fetch("/api/admin/media/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (serverRes.ok) {
-        const serverData = await serverRes.json();
-        if (serverData.key) {
-          return { key: serverData.key, publicUrl: serverData.publicUrl };
-        }
-      }
+      res = await fetch("/api/admin/media/upload", { method: "POST", body: formData });
     } catch {
-      // If server upload proxy is not reachable, fall through to presigned S3 PUT
+      throw new Error(`Could not reach the upload service for "${file.name}". Check your connection and try again.`);
     }
-
-    // 2. Fallback Strategy: Direct S3 upload via presigned PUT URL
-    const presignRes = await fetch("/api/admin/media/presign-upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: file.type,
-        sizeBytes: file.size,
-        folder,
-        slug,
-      }),
-    });
-
-    const presignData = await presignRes.json();
-    if (!presignRes.ok) {
-      throw new Error(presignData.message || presignData.error || "Failed to generate upload URL");
+    if (!res.ok) {
+      throw new Error(`Upload of "${file.name}" failed: ${await readApiError(res, "upload failed")}`);
     }
-
-    const s3Res = await fetch(presignData.uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
-    });
-
-    if (!s3Res.ok) {
-      throw new Error(`S3 upload failed (${s3Res.status} ${s3Res.statusText})`);
-    }
-
-    return { key: presignData.key, publicUrl: presignData.publicUrl };
+    const data = (await res.json()) as { key?: string; publicUrl?: string };
+    if (!data.key) throw new Error(`Upload of "${file.name}" failed: no storage key returned.`);
+    return { key: data.key, publicUrl: data.publicUrl ?? "" };
   };
 
   // Main Image Upload Handler
@@ -243,12 +290,8 @@ export function ProductManager({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    if (!isAllowedImageType(file.type)) {
       setErrorMessage("Please select a JPEG, PNG or WebP image.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setErrorMessage("Image file size must be under 10 MB.");
       return;
     }
 
@@ -260,7 +303,7 @@ export function ProductManager({
       if (!mainImageAlt) {
         setMainImageAlt(`${formName || "Luftansa"} bottle`);
       }
-      setSuccessMessage("Main image uploaded to S3.");
+      setSuccessMessage("Main image uploaded. Save the product to keep it.");
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Error uploading main image");
     } finally {
@@ -278,16 +321,24 @@ export function ProductManager({
     setErrorMessage(null);
     try {
       const newKeys: string[] = [];
-      for (const file of files) {
-        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) continue;
-        if (file.size > 10 * 1024 * 1024) continue;
-        const { key } = await uploadFileToS3(file, "gallery");
-        newKeys.push(key);
+      const failures: string[] = [];
+      const capacity = Math.max(0, 8 - galleryImageKeys.length);
+      if (files.length > capacity) {
+        failures.push(`Only ${capacity} more gallery image(s) can be added (maximum 8).`);
       }
-      setGalleryImageKeys((prev) => [...prev, ...newKeys]);
-      setSuccessMessage(`Uploaded ${newKeys.length} gallery image(s).`);
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Error uploading gallery image");
+      for (const file of files.slice(0, capacity)) {
+        try {
+          const { key } = await uploadFileToS3(file, "gallery");
+          newKeys.push(key);
+        } catch (err) {
+          failures.push(err instanceof Error ? err.message : `Upload of "${file.name}" failed.`);
+        }
+      }
+      if (newKeys.length > 0) {
+        setGalleryImageKeys((prev) => [...prev, ...newKeys]);
+        setSuccessMessage(`Uploaded ${newKeys.length} gallery image(s). Save the product to keep them.`);
+      }
+      if (failures.length > 0) setErrorMessage(failures.join(" "));
     } finally {
       setGalleryUploading(false);
       e.target.value = "";
@@ -300,12 +351,8 @@ export function ProductManager({
     noteId: string,
     file: File,
   ) => {
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    if (!isAllowedImageType(file.type)) {
       setErrorMessage("Please select a JPEG, PNG or WebP image for the note.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setErrorMessage("Note image size must be under 10 MB.");
       return;
     }
 
@@ -377,7 +424,7 @@ export function ProductManager({
     setLoading(true);
     setErrorMessage(null);
     try {
-      const res = await fetch("/api/admin/products", {
+      const res = await fetch("/api/admin/products?include=variants", {
         headers: { "Cache-Control": "no-cache" },
       });
       const data = await res.json();
@@ -401,10 +448,13 @@ export function ProductManager({
     setFormCategory(defaultType.name);
     setNotesEnabled(defaultType.hasNotes);
     setFormStatus("ACTIVE");
-    setFormGender("Unisex");
-    setFormConcentration("Eau de Parfum");
+    setFormGender("");
+    setFormConcentration("");
     setFormFeatured(false);
     setFormBestseller(false);
+    setFormCollections([]);
+    setFormDisplayOrder("");
+    setUnverifiedFields([]);
 
     setMainImageKey("");
     setMainImageAlt("");
@@ -413,17 +463,13 @@ export function ProductManager({
     setKeywordInput("");
     setNotes({ top: [], heart: [], base: [] });
 
-    setVariantsList([
-      { id: `v_${Date.now().toString(36)}_1`, capacity: 30, unit: "ml", label: "30 ml", priceInr: 400, stockQuantity: 0, sku: "", status: "ACTIVE" },
-      { id: `v_${Date.now().toString(36)}_2`, capacity: 50, unit: "ml", label: "50 ml", priceInr: 630, stockQuantity: 0, sku: "", status: "ACTIVE" },
-      { id: `v_${Date.now().toString(36)}_3`, capacity: 100, unit: "ml", label: "100 ml", priceInr: 1000, stockQuantity: 0, sku: "", status: "ACTIVE" },
-    ]);
+    setVariantsList(defaultVariantRows());
 
     setIsModalOpen(true);
     setErrorMessage(null);
   };
 
-  const openEditModal = async (product: ProductItem) => {
+  const openEditModal = async (product: ProductWithVariantList) => {
     setModalMode("EDIT");
     setActiveProduct(product);
     setFormName(product.name);
@@ -433,10 +479,16 @@ export function ProductManager({
     setFormCategory(product.category || "Perfume Spray");
     setFormStatus(product.status);
     setNotesEnabled(product.notesEnabled ?? true);
-    setFormGender(product.gender || "Unisex");
-    setFormConcentration(product.concentration || "Eau de Parfum");
+    setFormGender(product.gender || "");
+    setFormConcentration(product.concentration || "");
     setFormFeatured(product.featured || false);
     setFormBestseller(product.bestseller || false);
+    setFormCollections(product.collections ?? []);
+    setFormDisplayOrder(product.displayOrder !== undefined ? String(product.displayOrder) : "");
+    setUnverifiedFields(product.unverifiedFields ?? []);
+    if (product.variants && product.variants.length > 0) {
+      setVariantsList(toVariantRows(product.variants));
+    }
 
     setMainImageKey(product.mainImageKey || product.imageKey || "");
     setMainImageAlt(product.mainImageAlt || product.imageAlt || "");
@@ -459,10 +511,13 @@ export function ProductManager({
           setFormCategory(fresh.category || "Perfume Spray");
           setFormStatus(fresh.status);
           setNotesEnabled(fresh.notesEnabled ?? true);
-          setFormGender(fresh.gender || "Unisex");
-          setFormConcentration(fresh.concentration || "Eau de Parfum");
+          setFormGender(fresh.gender || "");
+          setFormConcentration(fresh.concentration || "");
           setFormFeatured(fresh.featured || false);
           setFormBestseller(fresh.bestseller || false);
+          setFormCollections(fresh.collections ?? []);
+          setFormDisplayOrder(fresh.displayOrder !== undefined ? String(fresh.displayOrder) : "");
+          setUnverifiedFields(fresh.unverifiedFields ?? []);
 
           setMainImageKey(fresh.mainImageKey || fresh.imageKey || "");
           setMainImageAlt(fresh.mainImageAlt || fresh.imageAlt || "");
@@ -471,23 +526,11 @@ export function ProductManager({
           setNotes(fresh.notes || { top: [], heart: [], base: [] });
         }
         if (data.variants && Array.isArray(data.variants)) {
-          const activeVariants = data.variants
-            .filter((v: ProductVariantItem) => v.status !== "ARCHIVED")
-            .map((v: ProductVariantItem, i: number) => ({
-              id: v.id || v.sk.replace("VARIANT#", "") || `v_${i}`,
-              capacity: v.capacity ?? v.sizeMl ?? 30,
-              unit: (v.unit as "ml" | "g" | "pieces" | "units" | "oz") || "ml",
-              label: v.label || `${v.capacity ?? v.sizeMl} ${v.unit || "ml"}`,
-              priceInr: v.priceInr,
-              mrpInr: v.mrpInr,
-              stockQuantity: v.stockQuantity ?? 0,
-              sku: v.sku,
-              status: (v.status === "ACTIVE" ? "ACTIVE" : "INACTIVE") as "ACTIVE" | "INACTIVE",
-            }));
-          if (activeVariants.length > 0) {
-            setVariantsList(activeVariants);
-          }
+          const rows = toVariantRows(data.variants as ProductVariantItem[]);
+          if (rows.length > 0) setVariantsList(rows);
         }
+      } else {
+        setErrorMessage(data.message || data.error || "Could not load the latest product data.");
       }
     } catch {
       // Keep initial variants
@@ -506,35 +549,41 @@ export function ProductManager({
 
   const addVariantRow = () => {
     const selectedType = productTypes.find((t) => t.id === formProductTypeId);
-    const unit = (selectedType?.defaultUnit as "ml" | "g" | "pieces" | "units" | "oz") || "ml";
+    const unit = (selectedType?.defaultUnit as VariantUnit) || "ml";
     const capacity = unit === "ml" ? 50 : 1;
-    const newVariant = {
+    const newVariant: VariantFormRow = {
       id: `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
       capacity,
       unit,
       label: `${capacity} ${unit}`,
-      priceInr: 500,
-      stockQuantity: 0,
-      sku: `LUF-${(formId || "ITEM").toUpperCase()}-${capacity}${unit.toUpperCase()}`,
-      status: "ACTIVE" as const,
+      // Pre-filled only for confirmed standard sizes; otherwise the admin must enter a price.
+      priceInr: standardPrice(capacity, unit) ?? 0,
+      stockQuantity: null,
+      sku: "",
+      status: "ACTIVE",
     };
     setVariantsList((prev) => [...prev, newVariant]);
   };
 
-  const updateVariantRow = (id: string, field: string, value: string | number | boolean) => {
+  const updateVariantRow = (id: string, field: keyof VariantFormRow, value: string | number | boolean | null) => {
     setVariantsList((prev) =>
       prev.map((v) => {
         if (v.id !== id) return v;
-        const updated = { ...v, [field]: value };
+        const updated = { ...v, [field]: value } as VariantFormRow;
         if (field === "capacity" || field === "unit") {
           updated.label = `${updated.capacity} ${updated.unit}`;
-          if (!v.sku || v.sku.startsWith("LUF-")) {
-            updated.sku = `LUF-${(formId || "ITEM").toUpperCase()}-${updated.capacity}${String(updated.unit).toUpperCase()}`;
-          }
         }
         return updated;
       }),
     );
+  };
+
+  const toggleCollection = (id: StorefrontCollection, checked: boolean) => {
+    setFormCollections((prev) => (checked ? Array.from(new Set([...prev, id])) : prev.filter((c) => c !== id)));
+  };
+
+  const markVerified = (field: VerifiableField) => {
+    setUnverifiedFields((prev) => prev.filter((f) => f !== field));
   };
 
   const removeVariantRow = (id: string) => {
@@ -591,15 +640,31 @@ export function ProductManager({
       base: notes.base.filter((n) => n.name.trim() !== ""),
     };
 
+    // Never submit invented prices: every variant needs an explicit positive price.
+    const missingPrice = variantsList.find((v) => !Number.isInteger(Number(v.priceInr)) || Number(v.priceInr) < 1);
+    if (missingPrice) {
+      setErrorMessage(`Please enter a price for the ${missingPrice.label || `${missingPrice.capacity} ${missingPrice.unit}`} variant.`);
+      setSubmitting(false);
+      return;
+    }
+    const displayOrderValue = formDisplayOrder.trim() === "" ? null : Number(formDisplayOrder);
+    if (displayOrderValue !== null && (!Number.isInteger(displayOrderValue) || displayOrderValue < 0)) {
+      setErrorMessage("Display order must be a whole number (0 or more), or left empty.");
+      setSubmitting(false);
+      return;
+    }
+    const isCreate = modalMode === "CREATE";
+
     const variantsPayload = variantsList.map((v, idx) => ({
       id: v.id,
       capacity: Number(v.capacity) || 1,
       unit: v.unit,
       label: v.label || `${v.capacity} ${v.unit}`,
-      priceInr: Number(v.priceInr) || 1,
+      priceInr: Number(v.priceInr),
       mrpInr: v.mrpInr ? Number(v.mrpInr) : undefined,
-      stockQuantity: Math.max(0, Number(v.stockQuantity) || 0),
-      sku: v.sku || `LUF-${formId.toUpperCase()}-${v.capacity}${v.unit.toUpperCase()}`,
+      // Unset values: omitted on create, explicitly cleared (null) on update.
+      stockQuantity: v.stockQuantity === null ? (isCreate ? undefined : null) : Math.max(0, Math.trunc(v.stockQuantity)),
+      sku: v.sku.trim() ? v.sku.trim() : isCreate ? undefined : null,
       status: v.status,
       sortOrder: idx,
     }));
@@ -621,10 +686,13 @@ export function ProductManager({
           galleryImageKeys,
           keywords,
           notes: cleanedNotes,
-          gender: formGender,
-          concentration: formConcentration,
+          gender: formGender || undefined,
+          concentration: formConcentration.trim() || undefined,
           featured: formFeatured,
           bestseller: formBestseller,
+          collections: formCollections,
+          displayOrder: displayOrderValue ?? undefined,
+          unverifiedFields,
           variants: variantsPayload,
         };
 
@@ -658,10 +726,13 @@ export function ProductManager({
           galleryImageKeys,
           keywords,
           notes: cleanedNotes,
-          gender: formGender,
-          concentration: formConcentration,
+          gender: formGender || null,
+          concentration: formConcentration.trim() || null,
           featured: formFeatured,
           bestseller: formBestseller,
+          collections: formCollections,
+          displayOrder: displayOrderValue,
+          unverifiedFields,
           variants: variantsPayload,
         };
 
@@ -934,6 +1005,14 @@ export function ProductManager({
                           <div>
                             <div className="font-semibold text-[#171717]">{p.name}</div>
                             <div className="font-mono text-[11px] text-[#78716C]">{p.id}</div>
+                            {(p.unverifiedFields?.length ?? 0) > 0 && (
+                              <span
+                                className="mt-0.5 mr-1 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.2 text-[10px] font-medium text-amber-800"
+                                title={`Unverified: ${(p.unverifiedFields ?? []).map((f) => UNVERIFIED_LABEL[f]).join(", ")}`}
+                              >
+                                <AlertCircle className="h-2.5 w-2.5" /> Unverified content
+                              </span>
+                            )}
                             {p.featured && (
                               <span className="mt-0.5 inline-flex items-center gap-1 rounded bg-[#FDF6E8] px-1.5 py-0.2 text-[10px] font-medium text-[#8C6D37]">
                                 <Sparkles className="h-2.5 w-2.5" /> Featured
@@ -985,17 +1064,7 @@ export function ProductManager({
                         </button>
                       </td>
                       <td className="px-4 py-3.5 font-mono text-[11px]">
-                        <div className="flex items-center gap-1.5">
-                          <span className="rounded bg-[#F8F5EC] px-1.5 py-0.5 text-[#292D27]">
-                            30ml: ₹{STANDARD_PRICES[30]}
-                          </span>
-                          <span className="rounded bg-[#F8F5EC] px-1.5 py-0.5 text-[#292D27]">
-                            50ml: ₹{STANDARD_PRICES[50]}
-                          </span>
-                          <span className="rounded bg-[#F8F5EC] px-1.5 py-0.5 text-[#292D27]">
-                            100ml: ₹{STANDARD_PRICES[100]}
-                          </span>
-                        </div>
+                        <VariantSummary variants={p.variants} />
                       </td>
                       <td className="px-4 py-3.5">
                         <span className="inline-flex items-center gap-1 rounded-md bg-[#FFFDF8] border border-[#E8E4DA] px-2 py-0.5 text-[11px] font-medium text-[#57534E]">
@@ -1089,7 +1158,12 @@ export function ProductManager({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#292D27]">Description</label>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="block text-xs font-semibold text-[#292D27]">Description</label>
+                    {unverifiedFields.includes("description") && (
+                      <UnverifiedBadge onVerify={() => markVerified("description")} />
+                    )}
+                  </div>
                   <textarea
                     rows={2}
                     value={formDescription}
@@ -1140,6 +1214,7 @@ export function ProductManager({
                       onChange={(e) => setFormGender(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-[#E8E4DA] bg-[#FFFDF8] px-3 py-2 text-xs text-[#171717] focus:border-[#C6A76A] focus:outline-none"
                     >
+                      <option value="">Not set</option>
                       <option value="Unisex">Unisex</option>
                       <option value="Men">Men</option>
                       <option value="Women">Women</option>
@@ -1152,7 +1227,7 @@ export function ProductManager({
                       type="text"
                       value={formConcentration}
                       onChange={(e) => setFormConcentration(e.target.value)}
-                      placeholder="Eau de Parfum"
+                      placeholder="Not set (e.g. Eau de Parfum)"
                       className="mt-1 w-full rounded-lg border border-[#E8E4DA] bg-[#FFFDF8] px-3 py-2 text-xs text-[#171717] focus:border-[#C6A76A] focus:outline-none"
                     />
                   </div>
@@ -1188,6 +1263,39 @@ export function ProductManager({
                     />
                     <span className="font-medium text-[#292D27]">Bestseller</span>
                   </label>
+                </div>
+
+                <div className="rounded-lg border border-[#E8E4DA] bg-[#FFFDF8] p-3 text-xs">
+                  <div className="text-[11px] font-semibold text-[#292D27]">Homepage placement</div>
+                  <p className="mt-0.5 text-[11px] text-[#78716C]">
+                    Best Sellers shows products marked &quot;Bestseller&quot;. The Personality Collection lists its members first,
+                    followed by every other active product. Lower display order appears first.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-5">
+                    {COLLECTION_OPTIONS.map((c) => (
+                      <label key={c.id} className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={formCollections.includes(c.id)}
+                          onChange={(e) => toggleCollection(c.id, e.target.checked)}
+                          className="rounded border-[#E8E4DA] text-[#C6A76A] focus:ring-[#C6A76A]"
+                        />
+                        <span className="font-medium text-[#292D27]">{c.label}</span>
+                      </label>
+                    ))}
+                    <label className="flex items-center gap-2">
+                      <span className="font-medium text-[#292D27]">Display order</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={formDisplayOrder}
+                        placeholder="Not set"
+                        onChange={(e) => setFormDisplayOrder(e.target.value)}
+                        className="w-24 rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717] placeholder:italic placeholder:text-[#A8A29E]"
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -1421,6 +1529,9 @@ export function ProductManager({
                       />
                       <span>Enable Notes</span>
                     </label>
+                    {unverifiedFields.includes("notes") && (
+                      <UnverifiedBadge onVerify={() => markVerified("notes")} />
+                    )}
                   </div>
                   <span className="text-[11px] text-[#78716C]">Each note carries its OWN individual image</span>
                 </div>
@@ -1627,8 +1738,9 @@ export function ProductManager({
                           <input
                             type="number"
                             min={1}
-                            value={variant.priceInr}
-                            onChange={(e) => updateVariantRow(variant.id, "priceInr", Number(e.target.value))}
+                            value={variant.priceInr > 0 ? variant.priceInr : ""}
+                            placeholder="Required"
+                            onChange={(e) => updateVariantRow(variant.id, "priceInr", e.target.value === "" ? 0 : Number(e.target.value))}
                             className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs font-semibold text-[#8C6D37]"
                           />
                         </div>
@@ -1639,9 +1751,18 @@ export function ProductManager({
                           <input
                             type="number"
                             min={0}
-                            value={variant.stockQuantity}
-                            onChange={(e) => updateVariantRow(variant.id, "stockQuantity", Math.max(0, Number(e.target.value)))}
-                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717]"
+                            step={1}
+                            value={variant.stockQuantity ?? ""}
+                            placeholder="Not set"
+                            title="Leave empty when stock has not been configured. 0 means out of stock."
+                            onChange={(e) =>
+                              updateVariantRow(
+                                variant.id,
+                                "stockQuantity",
+                                e.target.value === "" ? null : Math.max(0, Math.trunc(Number(e.target.value))),
+                              )
+                            }
+                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717] placeholder:italic placeholder:text-[#A8A29E]"
                           />
                         </div>
 
@@ -1651,8 +1772,10 @@ export function ProductManager({
                           <input
                             type="text"
                             value={variant.sku}
+                            placeholder="Not set"
+                            maxLength={64}
                             onChange={(e) => updateVariantRow(variant.id, "sku", e.target.value)}
-                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 font-mono text-[11px] text-[#171717]"
+                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 font-mono text-[11px] text-[#171717] placeholder:font-sans placeholder:italic placeholder:text-[#A8A29E]"
                           />
                         </div>
                       </div>
@@ -1782,6 +1905,50 @@ export function ProductManager({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Marks imported content that Luftansa has not yet confirmed. */
+function UnverifiedBadge({ onVerify }: { onVerify: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10.5px] text-amber-900">
+      <AlertCircle className="h-3 w-3 text-amber-600" />
+      <span>Unverified: imported from the storefront reference design, not yet confirmed.</span>
+      <button
+        type="button"
+        onClick={onVerify}
+        className="font-semibold underline underline-offset-2 hover:text-amber-950"
+        title="Mark as confirmed. Takes effect when you save."
+      >
+        Mark verified
+      </button>
+    </span>
+  );
+}
+
+/** Active variant prices and stock state for the product list. */
+function VariantSummary({ variants }: { variants?: ProductVariantItem[] }) {
+  const visible = (variants ?? [])
+    .filter((v) => v.status !== "ARCHIVED")
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  if (visible.length === 0) {
+    return <span className="text-[#A8A29E]">No variants</span>;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {visible.map((v) => (
+        <span
+          key={v.sk}
+          className={`rounded px-1.5 py-0.5 ${v.status === "ACTIVE" ? "bg-[#F8F5EC] text-[#292D27]" : "bg-stone-100 text-stone-500 line-through"}`}
+          title={`${v.status === "ACTIVE" ? "Active" : "Inactive"} · Stock: ${v.stockQuantity ?? "Not set"} · SKU: ${v.sku ?? "Not set"}`}
+        >
+          {v.label ?? `${v.capacity ?? v.sizeMl} ${v.unit ?? "ml"}`}: ₹{v.priceInr.toLocaleString("en-IN")}
+          <span className="ml-1 font-sans text-[10px] text-[#78716C]">
+            {v.stockQuantity === undefined ? "· stock not set" : `· ${v.stockQuantity} in stock`}
+          </span>
+        </span>
+      ))}
     </div>
   );
 }

@@ -1,18 +1,14 @@
 import "server-only";
 
-import {
-  type BottleSizeMl,
-  type ProductOption,
-  PRODUCTS,
-  sprayOptions,
-  type Product as HardcodedProduct,
-} from "@/data/products";
-import { FRAGRANCE_PROFILES, getNoteImage } from "@/data/fragrance-profiles";
+import type { BottleSizeMl, ProductOption } from "@/data/products";
+import { getNoteImage } from "@/data/fragrance-profiles";
+import { buildLegacyCatalogue } from "@/lib/catalogue/legacy-catalogue";
 import { getDataServices } from "@/lib/db/client";
-import { getProductWithVariants, listProducts } from "@/lib/db/products-service";
+import { getProductWithVariants, listAllProductsWithVariants } from "@/lib/db/products-service";
 import type { FragranceNoteItem, ProductItem, ProductVariantItem } from "@/lib/db/schemas";
 import { getAssetUrl } from "@/lib/assets";
 import { productHref } from "@/lib/routes";
+import { sortByDisplayOrder } from "@/lib/storefront/collections";
 import type { ProductCardData } from "@/components/collection/ProductCard";
 
 export interface StorefrontNote {
@@ -41,9 +37,13 @@ export interface UnifiedStorefrontProduct {
   };
   featured: boolean;
   bestseller: boolean;
+  /** Homepage collections this product is placed in ("signature", "personality"). */
+  collections: readonly string[];
+  displayOrder?: number;
   concentration?: string;
   gender?: string;
-  source: "dynamodb" | "hardcoded";
+  /** "dynamodb" normally; "fallback" only while DynamoDB is unreachable. */
+  source: "dynamodb" | "fallback";
 }
 
 function resolveAssetUrl(key: string | undefined): string | undefined {
@@ -52,68 +52,57 @@ function resolveAssetUrl(key: string | undefined): string | undefined {
   return getAssetUrl(key);
 }
 
-/** Converts a DynamoDB ProductItem and its variants into a UnifiedStorefrontProduct */
-function mapDynamoToUnified(
+/**
+ * Purchasable options: ACTIVE variants only, in their configured order.
+ * Inactive and archived variants never reach the storefront, and no option
+ * or price is ever synthesised when a product has no active variants.
+ */
+export function toStorefrontOptions(variants: readonly ProductVariantItem[]): ProductOption[] {
+  return variants
+    .filter((v) => v.status === "ACTIVE")
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    .map((v) => {
+      const capacity = v.capacity ?? v.sizeMl;
+      const unit = v.unit ?? "ml";
+      return {
+        id: v.id ?? v.sk.replace("VARIANT#", ""),
+        label: v.label || `${capacity} ${unit}`,
+        priceInr: v.priceInr,
+        mrpInr: v.mrpInr !== undefined && v.mrpInr > v.priceInr ? v.mrpInr : undefined,
+      };
+    });
+}
+
+function mapNotes(items: readonly FragranceNoteItem[] = []): StorefrontNote[] {
+  return items.map((n) => {
+    const src = resolveAssetUrl(n.imageKey);
+    // Keep the descriptive alt text of the curated note photography when it is used.
+    const curated = getNoteImage(n.name);
+    const alt = curated && curated.src === n.imageKey ? curated.alt : n.name;
+    return { name: n.name, description: n.description, image: src ? { src, alt } : undefined };
+  });
+}
+
+/** Converts a DynamoDB product and its variants into the storefront view model. */
+export function mapProductToStorefront(
   product: ProductItem,
-  variants: ProductVariantItem[] = [],
+  variants: readonly ProductVariantItem[],
+  source: UnifiedStorefrontProduct["source"] = "dynamodb",
 ): UnifiedStorefrontProduct {
-  const mainKey = product.mainImageKey || product.imageKey;
-  const mainImage = mainKey
-    ? {
-        src: resolveAssetUrl(mainKey)!,
-        alt: product.mainImageAlt || product.imageAlt || `${product.name} bottle`,
-      }
+  const mainSrc = resolveAssetUrl(product.mainImageKey || product.imageKey);
+  const mainImage = mainSrc
+    ? { src: mainSrc, alt: product.mainImageAlt || product.imageAlt || `${product.name} bottle` }
     : undefined;
 
   const galleryImages = (product.galleryImageKeys ?? [])
     .map((k) => resolveAssetUrl(k))
     .filter((src): src is string => Boolean(src))
-    .map((src, idx) => ({
-      src,
-      alt: `${product.name} photograph ${idx + 1}`,
-    }));
+    .map((src, idx) => ({ src, alt: `${product.name} photograph ${idx + 1}` }));
 
-  // Build options from ACTIVE variants only (Requirement 4: Prevents archived/inactive variants from appearing on storefront)
-  const activeVariants = variants
-    .filter((v) => v.status === "ACTIVE")
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-
-  let options: ProductOption[];
-  if (activeVariants.length > 0) {
-    options = activeVariants.map((v) => {
-      const capacity = v.capacity ?? v.sizeMl ?? 30;
-      const unit = v.unit ?? "ml";
-      const label = v.label || `${capacity} ${unit}`;
-      return {
-        id: v.id ?? `${capacity}${unit}`,
-        label,
-        priceInr: v.priceInr,
-        mrpInr: v.mrpInr,
-      };
-    });
-  } else {
-    // Fallback if variants list is unpopulated
-    const sizes = (product.sizes as BottleSizeMl[]) ?? [30, 50, 100];
-    options = sizes.map((size) => ({
-      id: `${size}ml`,
-      label: `${size} ml`,
-      priceInr: size === 30 ? 400 : size === 50 ? 630 : 1000,
-    }));
-  }
-
-  const mapNotes = (items: FragranceNoteItem[] = []): StorefrontNote[] =>
-    items.map((n) => ({
-      name: n.name,
-      description: n.description,
-      image: n.imageKey ? { src: resolveAssetUrl(n.imageKey)!, alt: n.name } : undefined,
-    }));
-
-  const topNotes = mapNotes(product.notes?.top);
-  const heartNotes = mapNotes(product.notes?.heart);
-  const baseNotes = mapNotes(product.notes?.base);
-  const hasNotes =
-    Boolean(product.notesEnabled ?? true) &&
-    (topNotes.length > 0 || heartNotes.length > 0 || baseNotes.length > 0);
+  const top = mapNotes(product.notes?.top);
+  const heart = mapNotes(product.notes?.heart);
+  const base = mapNotes(product.notes?.base);
+  const hasNotes = (product.notesEnabled ?? true) && top.length + heart.length + base.length > 0;
 
   return {
     slug: product.id,
@@ -123,166 +112,83 @@ function mapDynamoToUnified(
     productTypeId: product.productTypeId,
     productTypeName: product.productTypeName || product.category,
     hasNotes,
-    sizes: (product.sizes as BottleSizeMl[]) ?? [30, 50, 100],
-    options,
+    sizes: (product.sizes ?? []).filter((s): s is BottleSizeMl => s === 30 || s === 50 || s === 100),
+    options: toStorefrontOptions(variants),
     mainImage,
     galleryImages,
     keywords: product.keywords ?? [],
-    notes: {
-      top: topNotes,
-      heart: heartNotes,
-      base: baseNotes,
-    },
+    notes: { top, heart, base },
     featured: product.featured ?? false,
     bestseller: product.bestseller ?? false,
+    collections: product.collections ?? [],
+    displayOrder: product.displayOrder,
     concentration: product.concentration,
     gender: product.gender,
-    source: "dynamodb",
+    source,
   };
 }
 
-/** Converts a hardcoded product from src/data/products.ts into a UnifiedStorefrontProduct */
-function mapHardcodedToUnified(product: HardcodedProduct): UnifiedStorefrontProduct {
-  const profile = FRAGRANCE_PROFILES[product.slug] ?? {};
-  const mainImage = product.image
-    ? {
-        src: getAssetUrl(product.image.key),
-        alt: product.image.alt,
-        objectPosition: product.image.objectPosition,
-      }
-    : undefined;
-
-  const galleryImages = (product.gallery ?? []).map((img) => ({
-    src: getAssetUrl(img.key),
-    alt: img.alt,
-    objectPosition: img.objectPosition,
-  }));
-
-  const mapTier = (noteName?: string): StorefrontNote[] => {
-    if (!noteName) return [];
-    const img = getNoteImage(noteName);
-    return [
-      {
-        name: noteName,
-        image: img ? { src: img.src, alt: img.alt } : undefined,
-      },
-    ];
-  };
-
-  return {
-    slug: product.slug,
-    name: product.name,
-    description: product.description ?? profile.description,
-    category: product.category ?? "Perfume",
-    hasNotes: true,
-    sizes: product.sizes,
-    options: sprayOptions(product),
-    mainImage,
-    galleryImages,
-    keywords: [],
-    notes: {
-      top: mapTier(profile.notes?.top),
-      heart: mapTier(profile.notes?.middle),
-      base: mapTier(profile.notes?.base),
-    },
-    featured: false,
-    bestseller: false,
-    concentration: product.concentration,
-    gender: product.gender,
-    source: "hardcoded",
-  };
+/** Active products only, in storefront display order. */
+export function buildStorefrontCatalogue(
+  entries: readonly { product: ProductItem; variants: readonly ProductVariantItem[] }[],
+  source: UnifiedStorefrontProduct["source"] = "dynamodb",
+): UnifiedStorefrontProduct[] {
+  return sortByDisplayOrder(
+    entries
+      .filter((e) => e.product.status === "ACTIVE")
+      .map((e) => mapProductToStorefront(e.product, e.variants, source)),
+  );
 }
 
 /**
- * Retrieves all active products for the public storefront.
- *
- * Rules:
- * - Reads active DynamoDB products (`status === "ACTIVE"`).
- * - Suppresses products marked `INACTIVE` in DynamoDB (they will NOT fallback to hardcoded).
- * - Preserves hardcoded catalogue products that do not exist in DynamoDB.
- * - Deduplicates: DynamoDB version takes precedence for the same slug.
- * - If DynamoDB is offline or fails, falls back gracefully to hardcoded catalogue.
+ * Outage fallback: the legacy catalogue, used ONLY when DynamoDB cannot be
+ * reached (or is not configured). It is never merged with DynamoDB data, so
+ * products deleted or deactivated in the admin can never reappear.
+ */
+export function fallbackStorefrontCatalogue(): UnifiedStorefrontProduct[] {
+  const { entries } = buildLegacyCatalogue({ now: new Date(0).toISOString() });
+  return buildStorefrontCatalogue(entries, "fallback");
+}
+
+/**
+ * All active products for the public storefront.
+ * DynamoDB is the single source of truth (the same data the admin manages).
  */
 export async function getActiveStorefrontProducts(): Promise<UnifiedStorefrontProduct[]> {
   const data = getDataServices();
-  const suppressedSlugs = new Set<string>();
-  const unifiedMap = new Map<string, UnifiedStorefrontProduct>();
-
-  if (data) {
-    try {
-      // Fetch products using GSI1 zero-scan query
-      const { items: allDbProducts } = await listProducts(data.repo, { limit: 100 });
-
-      for (const item of allDbProducts) {
-        if (item.status === "INACTIVE") {
-          suppressedSlugs.add(item.id);
-        } else if (item.status === "ACTIVE") {
-          // Fetch variants for each active product
-          try {
-            const withVariants = await getProductWithVariants(data.repo, item.id);
-            unifiedMap.set(item.id, mapDynamoToUnified(item, withVariants?.variants));
-          } catch {
-            unifiedMap.set(item.id, mapDynamoToUnified(item));
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("[storefront] DynamoDB read failed, falling back to hardcoded catalogue:", (e as Error).message);
-    }
+  if (!data) {
+    console.error("[storefront] DynamoDB is not configured; serving the outage fallback catalogue.");
+    return fallbackStorefrontCatalogue();
   }
-
-  // Merge hardcoded catalogue for any product not yet registered in DynamoDB
-  for (const hardcoded of PRODUCTS) {
-    // If explicitly marked INACTIVE in DynamoDB, it must remain hidden
-    if (suppressedSlugs.has(hardcoded.slug)) {
-      continue;
-    }
-    // If already active from DynamoDB, DynamoDB takes precedence
-    if (unifiedMap.has(hardcoded.slug)) {
-      continue;
-    }
-    unifiedMap.set(hardcoded.slug, mapHardcodedToUnified(hardcoded));
+  try {
+    const entries = await listAllProductsWithVariants(data.repo, { status: "ACTIVE" });
+    return buildStorefrontCatalogue(entries);
+  } catch (e) {
+    console.error("[storefront] DynamoDB read failed; serving the outage fallback catalogue:", (e as Error).message);
+    return fallbackStorefrontCatalogue();
   }
-
-  return Array.from(unifiedMap.values());
 }
 
 /**
- * Retrieves a single product for the product detail page by slug.
- *
- * Rules:
- * - If the product exists in DynamoDB and is `INACTIVE`, returns `null` (404, never fallback to active).
- * - If active in DynamoDB, returns the DynamoDB record.
- * - If not found in DynamoDB, falls back to hardcoded catalogue.
- * - If DynamoDB is unavailable, falls back gracefully to hardcoded catalogue.
+ * A single active product for the product detail page, or null (404) when it
+ * does not exist in DynamoDB or is inactive.
  */
 export async function getActiveStorefrontProductBySlug(
   slug: string,
 ): Promise<UnifiedStorefrontProduct | null> {
   const data = getDataServices();
-
   if (data) {
     try {
-      const dbResult = await getProductWithVariants(data.repo, slug);
-      if (dbResult) {
-        // Inactive products in DynamoDB MUST NOT be exposed on storefront
-        if (dbResult.product.status === "INACTIVE") {
-          return null;
-        }
-        return mapDynamoToUnified(dbResult.product, dbResult.variants);
-      }
+      const result = await getProductWithVariants(data.repo, slug);
+      if (!result || result.product.status !== "ACTIVE") return null;
+      return mapProductToStorefront(result.product, result.variants);
     } catch (e) {
-      console.warn(`[storefront] DynamoDB lookup failed for ${slug}, checking hardcoded fallback:`, (e as Error).message);
+      console.error(`[storefront] DynamoDB lookup failed for ${slug}; using the outage fallback:`, (e as Error).message);
     }
+  } else {
+    console.error("[storefront] DynamoDB is not configured; using the outage fallback.");
   }
-
-  // Fallback to hardcoded catalogue
-  const hardcoded = PRODUCTS.find((p) => p.slug === slug);
-  if (hardcoded) {
-    return mapHardcodedToUnified(hardcoded);
-  }
-
-  return null;
+  return fallbackStorefrontCatalogue().find((p) => p.slug === slug) ?? null;
 }
 
 /** Formats a UnifiedStorefrontProduct into ProductCardData */

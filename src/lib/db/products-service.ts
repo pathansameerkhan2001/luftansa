@@ -1,7 +1,7 @@
 import "server-only";
 
 import { ENTITY, keys, SK_PREFIX, assertId } from "./keys";
-import { Repository, NotFoundError } from "./repository";
+import { Repository, NotFoundError, ValidationError } from "./repository";
 import { AuditService } from "./audit";
 import {
   type ProductCreateInput,
@@ -17,6 +17,32 @@ import {
   STANDARD_PRICES_INR,
 } from "./schemas";
 import type { TransactOperation } from "./repository";
+
+/** Confirmed standard price for a standard spray size (30/50/100 ml), otherwise undefined. */
+function standardPriceFor(capacity: number, unit: string): number | undefined {
+  return unit === "ml" ? (STANDARD_PRICES_INR as Record<number, number>)[capacity] : undefined;
+}
+
+/** Price for a new variant: explicit price, or the confirmed standard price. Never invented. */
+function resolveNewVariantPrice(priceInr: number | undefined, capacity: number, unit: string, index: number): number {
+  const price = priceInr ?? standardPriceFor(capacity, unit);
+  if (price === undefined) {
+    throw new ValidationError([
+      { path: `variants.${index}.priceInr`, message: `A price is required for ${capacity} ${unit} (no confirmed standard price).` },
+    ]);
+  }
+  return price;
+}
+
+/** null clears an optional value, undefined keeps the current one. */
+function nextOptional<T>(input: T | null | undefined, current: T | undefined): T | undefined {
+  if (input === null) return undefined;
+  return input ?? current;
+}
+
+function unique<T>(values: readonly T[] | undefined): T[] | undefined {
+  return values ? Array.from(new Set(values)) : undefined;
+}
 
 export interface ProductWithVariants {
   product: ProductItem;
@@ -94,6 +120,43 @@ export async function listProducts(
 }
 
 /**
+ * Lists every product (all pages) via GSI1. Optionally filtered by status.
+ * Bounded to `maxPages` pages of 100 to keep a request predictable.
+ */
+export async function listAllProducts(
+  repo: Repository,
+  options: { status?: ProductStatus; maxPages?: number } = {},
+): Promise<ProductItem[]> {
+  const out: ProductItem[] = [];
+  let cursor: string | undefined;
+  const maxPages = options.maxPages ?? 20;
+  for (let page = 0; page < maxPages; page++) {
+    const result = await listProducts(repo, { status: options.status, limit: 100, cursor });
+    out.push(...result.items);
+    cursor = result.cursor;
+    if (!cursor) break;
+  }
+  return out;
+}
+
+/** Every product with its variants (variants fetched in parallel, one query per product). */
+export async function listAllProductsWithVariants(
+  repo: Repository,
+  options: { status?: ProductStatus } = {},
+): Promise<ProductWithVariants[]> {
+  const products = await listAllProducts(repo, options);
+  const withVariants = await Promise.all(
+    products.map(async (product) => {
+      const { items } = await repo.query(keys.product(product.id).pk, productVariantItemSchema, {
+        skPrefix: SK_PREFIX.variant,
+      });
+      return { product, variants: items.map(normalizeVariant) };
+    }),
+  );
+  return withVariants;
+}
+
+/**
  * Retrieves a single product and all its variants.
  * Zero table scans: queries base table item and variant partition prefix.
  */
@@ -158,6 +221,9 @@ export async function createProduct(
     gender: input.gender,
     featured: input.featured ?? false,
     bestseller: input.bestseller ?? false,
+    collections: unique(input.collections),
+    displayOrder: input.displayOrder,
+    unverifiedFields: unique(input.unverifiedFields),
     GSI1PK: "PRODUCTS",
     GSI1SK: keys.productGsi1(input.status, input.id).GSI1SK,
     GSI2PK: keys.productGsi2(category, input.id).GSI2PK,
@@ -178,8 +244,7 @@ export async function createProduct(
         ? assertId(vInput.id, "variantId")
         : `v_${Date.now().toString(36)}_${i}_${Math.random().toString(36).slice(2, 6)}`;
       const label = vInput.label ?? `${capacity} ${unit}`;
-      const priceInr = vInput.priceInr ?? (capacity === 30 ? 400 : capacity === 50 ? 630 : capacity === 100 ? 1000 : 500);
-      const sku = vInput.sku ?? `LUF-${input.id.toUpperCase()}-${String(capacity).replace(/\./g, "_")}${unit.toUpperCase()}`;
+      const priceInr = resolveNewVariantPrice(vInput.priceInr, capacity, unit, i);
 
       const variantKey = keys.variant(input.id, variantId);
       const variantItem: ProductVariantItem = {
@@ -194,8 +259,8 @@ export async function createProduct(
         sizeMl: unit === "ml" ? capacity : undefined,
         priceInr,
         mrpInr: vInput.mrpInr,
-        stockQuantity: vInput.stockQuantity ?? 0,
-        sku,
+        stockQuantity: vInput.stockQuantity ?? undefined,
+        sku: vInput.sku ?? undefined,
         status: vInput.status ?? "ACTIVE",
         sortOrder: vInput.sortOrder ?? i,
         createdAt: now,
@@ -211,8 +276,7 @@ export async function createProduct(
       const size = Number(sizes[i]) || 30;
       const variantId = String(size).padStart(5, "0");
       const variantKey = keys.variant(input.id, variantId);
-      const priceInr = (STANDARD_PRICES_INR as Record<number, number>)[size] ?? 500;
-      const sku = `LUF-${input.id.toUpperCase()}-${size}ML`;
+      const priceInr = resolveNewVariantPrice(undefined, size, "ml", i);
       const variantItem: ProductVariantItem = {
         pk: variantKey.pk,
         sk: variantKey.sk,
@@ -224,8 +288,6 @@ export async function createProduct(
         label: `${size} ml`,
         sizeMl: size,
         priceInr,
-        stockQuantity: 0,
-        sku,
         status: "ACTIVE",
         sortOrder: i,
         createdAt: now,
@@ -317,6 +379,9 @@ export async function updateProduct(
     gender: input.gender === null ? undefined : (input.gender ?? existing.product.gender),
     featured: input.featured ?? existing.product.featured,
     bestseller: input.bestseller ?? existing.product.bestseller,
+    collections: unique(input.collections) ?? existing.product.collections,
+    displayOrder: nextOptional(input.displayOrder, existing.product.displayOrder),
+    unverifiedFields: unique(input.unverifiedFields) ?? existing.product.unverifiedFields,
     GSI1PK: "PRODUCTS",
     GSI1SK: keys.productGsi1(nextStatus, productId).GSI1SK,
     GSI2PK: keys.productGsi2(nextCategory, productId).GSI2PK,
@@ -351,9 +416,9 @@ export async function updateProduct(
 
       if (existingVariant) {
         const nextPrice = vInput.priceInr ?? existingVariant.priceInr;
-        const nextStock = vInput.stockQuantity ?? existingVariant.stockQuantity;
+        const nextStock = nextOptional(vInput.stockQuantity, existingVariant.stockQuantity);
         const nextStatus = vInput.status ?? existingVariant.status;
-        const nextSku = vInput.sku ?? existingVariant.sku;
+        const nextSku = nextOptional(vInput.sku, existingVariant.sku);
         const nextLabel = vInput.label ?? existingVariant.label ?? `${capacity} ${unit}`;
 
         const replaced: ProductVariantItem = {
@@ -381,7 +446,6 @@ export async function updateProduct(
         });
         updatedVariants.push(replaced);
       } else {
-        const sku = vInput.sku ?? `LUF-${productId.toUpperCase()}-${String(capacity).replace(/\./g, "_")}${unit.toUpperCase()}`;
         const created: ProductVariantItem = {
           pk: variantKey.pk,
           sk: variantKey.sk,
@@ -392,10 +456,10 @@ export async function updateProduct(
           unit,
           label: vInput.label ?? `${capacity} ${unit}`,
           sizeMl: unit === "ml" ? capacity : undefined,
-          priceInr: vInput.priceInr ?? (capacity === 30 ? 400 : capacity === 50 ? 630 : capacity === 100 ? 1000 : 500),
+          priceInr: resolveNewVariantPrice(vInput.priceInr, capacity, unit, i),
           mrpInr: vInput.mrpInr,
-          stockQuantity: vInput.stockQuantity ?? 0,
-          sku,
+          stockQuantity: vInput.stockQuantity ?? undefined,
+          sku: vInput.sku ?? undefined,
           status: vInput.status ?? "ACTIVE",
           sortOrder: vInput.sortOrder ?? i,
           createdAt: now,

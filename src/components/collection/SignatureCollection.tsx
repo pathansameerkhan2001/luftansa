@@ -1,18 +1,14 @@
-import { SIGNATURE_PRODUCT_SLUGS } from "@/data/products";
+import { selectSignature } from "@/lib/storefront/collections";
 import { getActiveStorefrontProducts, toStorefrontCardData } from "@/lib/storefront/products";
 import { ProductCard, type ProductCardData } from "./ProductCard";
 
 /**
  * "Our Collection: Signature Fragrances" (Server Component).
- * Active products from DynamoDB or hardcoded fallback.
+ * Active DynamoDB products placed in the "signature" collection (admin-managed).
  */
-export async function SignatureCollection({ slugs = SIGNATURE_PRODUCT_SLUGS }: { slugs?: readonly string[] }) {
+export async function SignatureCollection() {
   const allActive = await getActiveStorefrontProducts();
-  const productMap = new Map(allActive.map((p) => [p.slug, p]));
-  const products: ProductCardData[] = slugs
-    .map((s) => productMap.get(s))
-    .filter((p): p is NonNullable<typeof p> => Boolean(p))
-    .map(toStorefrontCardData);
+  const products: ProductCardData[] = selectSignature(allActive).map(toStorefrontCardData);
 
   if (products.length === 0) return null;
 

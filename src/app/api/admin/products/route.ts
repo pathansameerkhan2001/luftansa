@@ -2,8 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { withAdmin } from "@/lib/auth/require-admin";
 import { getDataServices } from "@/lib/db/client";
 import { ConflictError, ValidationError } from "@/lib/db/repository";
-import { createProduct, listProducts } from "@/lib/db/products-service";
+import { createProduct, listAllProductsWithVariants, listProducts } from "@/lib/db/products-service";
 import { productCreateInputSchema, productStatusSchema } from "@/lib/db/schemas";
+import { revalidateStorefront } from "@/lib/storefront/revalidate";
 import { ZodError } from "zod";
 
 export const runtime = "nodejs";
@@ -29,6 +30,14 @@ export const GET = withAdmin(async (request: NextRequest) => {
   const limit = limitParam ? Number.parseInt(limitParam, 10) : 50;
 
   try {
+    // ?include=variants returns every product (all pages) with its variants (admin list view).
+    if (searchParams.get("include") === "variants") {
+      const entries = await listAllProductsWithVariants(data.repo, { status });
+      return NextResponse.json({
+        ok: true,
+        items: entries.map((e) => ({ ...e.product, variants: e.variants })),
+      });
+    }
     const result = await listProducts(data.repo, {
       status,
       limit: Number.isNaN(limit) ? 50 : limit,
@@ -65,6 +74,7 @@ export const POST = withAdmin(async (request: NextRequest, { session }) => {
   try {
     const input = productCreateInputSchema.parse(body);
     const result = await createProduct(data.repo, data.audit, session.email, input);
+    revalidateStorefront(result.product.id);
     return NextResponse.json({ ok: true, product: result.product, variants: result.variants }, { status: 201 });
   } catch (e) {
     if (e instanceof ZodError) {
