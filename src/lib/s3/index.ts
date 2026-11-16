@@ -22,6 +22,11 @@ export const S3_ASSET_FOLDERS = [
   "general/",
   "reels/thumbnails/",
   "reels/videos/",
+  // CMS media (Phase 3)
+  "videos/",
+  "lab/",
+  "manufacturing/",
+  "cms/",
 ] as const;
 
 export type S3AssetFolder = (typeof S3_ASSET_FOLDERS)[number];

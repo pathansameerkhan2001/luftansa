@@ -23,7 +23,7 @@ export async function requireAdminPage(): Promise<AdminSession> {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function jsonError(status: number, error: string) {
-  return NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }
 
 /**
@@ -70,6 +70,8 @@ export function withAdmin<P extends RouteParams = Record<string, never>>(handler
     if (!auth.ok) return auth.response;
     const response = await handler(request, { ...context, session: auth.session });
     response.headers.set("Cache-Control", "no-store");
+    // Same header the middleware adds, so routes it does not cover (the upload endpoint) keep parity.
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
     return response;
   };
 }

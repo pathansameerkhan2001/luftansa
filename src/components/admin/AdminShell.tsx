@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ExternalLink, LogOut, Menu, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { ADMIN_NAV, isActiveAdminPath } from "./admin-nav";
+import { ADMIN_NAV_GROUPS, ADMIN_PAGES, isActiveAdminPath } from "./admin-nav";
 
 const FOCUS_DARK = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c6a76a]";
 const FOCUS_LIGHT = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold";
@@ -62,8 +62,11 @@ function Brand({ logoUrl = "/media/logo/logo.jpeg" }: { logoUrl?: string }) {
 function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
     <nav aria-label="Admin sections" className="flex-1 overflow-y-auto px-3 py-4">
+      {ADMIN_NAV_GROUPS.map((group, gi) => (
+        <div key={group.label} className={gi > 0 ? "mt-5" : undefined}>
+          <p className="px-3.5 pb-1.5 text-[10.5px] font-semibold tracking-[0.2em] text-[#c6a76a]/70 uppercase">{group.label}</p>
       <ul className="space-y-1">
-        {ADMIN_NAV.map(({ label, href, Icon }) => {
+        {group.items.map(({ label, href, Icon }) => {
           const active = isActiveAdminPath(pathname, href);
           return (
             <li key={href}>
@@ -90,6 +93,8 @@ function SidebarNav({ pathname, onNavigate }: { pathname: string; onNavigate?: (
           );
         })}
       </ul>
+        </div>
+      ))}
     </nav>
   );
 }
@@ -106,7 +111,7 @@ export function AdminShell({
 }) {
   const pathname = usePathname() ?? "/admin";
   const [open, setOpen] = useState(false);
-  const current = ADMIN_NAV.find((n) => isActiveAdminPath(pathname, n.href));
+  const current = ADMIN_PAGES.find((n) => isActiveAdminPath(pathname, n.href));
   const initial = email.charAt(0).toUpperCase();
 
   // Close the drawer on Escape; lock background scroll while it is open.

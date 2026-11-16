@@ -2,7 +2,12 @@
  * Legacy catalogue import (DynamoDB).
  *
  *   npm run catalogue:import                         # dry run (default): reads only, prints the plan
- *   npm run catalogue:import -- --apply --actor <admin-email>   # actor must be in ADMIN_EMAILS
+ *   npm run catalogue:import -- --apply --confirm-production-write --actor <admin-email>
+ *                                                    # writes to PRODUCTION; actor must be in ADMIN_EMAILS
+ *
+ * This is the only tool that intentionally targets the production table from
+ * a computer, so writing requires both --apply and --confirm-production-write
+ * (plus the allow-listed actor), all checked before any AWS client exists.
  *
  * Dry run is enforced at the client level: every command other than GetItem
  * and Query is rejected before it reaches AWS.
@@ -14,12 +19,11 @@ import path from "node:path";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { AuditService } from "../src/lib/db/audit";
-import { getDbConfig } from "../src/lib/db/config";
 import { Repository } from "../src/lib/db/repository";
 import {
   applyCatalogueImport,
   planCatalogueImport,
-  resolveAuthorizedActor,
+  resolveImportMode,
   type ImportPlan,
 } from "../src/lib/catalogue/import-catalogue";
 
@@ -30,13 +34,6 @@ function loadEnvLocal() {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
     if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
   }
-}
-
-function parseArgs(argv: string[]) {
-  const apply = argv.includes("--apply");
-  const actorIdx = argv.indexOf("--actor");
-  const actor = actorIdx >= 0 ? argv[actorIdx + 1] : undefined;
-  return { apply, actor };
 }
 
 type Sender = Pick<DynamoDBDocumentClient, "send">;
@@ -84,15 +81,19 @@ function printPlan(plan: ImportPlan, table: string, region: string) {
 
 async function main() {
   loadEnvLocal();
-  const { apply, actor } = parseArgs(process.argv.slice(2));
-  const config = getDbConfig();
-  if (!config) throw new Error("DynamoDB is not configured (DYNAMODB_TABLE / DYNAMODB_REGION).");
+  // Writing requires --apply AND --confirm-production-write AND an allow-listed
+  // --actor (same source and normalisation as the admin login). Checked before
+  // any AWS client exists.
+  const decision = resolveImportMode(process.argv.slice(2), process.env.ADMIN_EMAILS?.trim() || process.env.ADMIN_EMAIL?.trim());
+  const apply = decision.mode === "apply";
+  const authorizedActor = decision.mode === "apply" ? decision.actor : undefined;
 
-  // --apply: the actor must be on the administrator allow-list (same source and
-  // normalisation as the admin login). Checked before any AWS client exists.
-  const authorizedActor = apply
-    ? resolveAuthorizedActor(actor, process.env.ADMIN_EMAILS?.trim() || process.env.ADMIN_EMAIL?.trim())
-    : undefined;
+  // This tool deliberately targets the production table (the app's local
+  // default table name does not apply here).
+  const config = {
+    tableName: process.env.DYNAMODB_TABLE?.trim() || "luftansa-store",
+    region: (process.env.DYNAMODB_REGION ?? process.env.AWS_REGION ?? "ap-south-2").trim(),
+  };
 
   const doc = DynamoDBDocumentClient.from(new DynamoDBClient({ region: config.region }), {
     marshallOptions: { removeUndefinedValues: true, convertClassInstanceToMap: false },

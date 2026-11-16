@@ -38,6 +38,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local development stack (DynamoDB Local, local media, local auth secret)
+/.local/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

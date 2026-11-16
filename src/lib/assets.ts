@@ -1,5 +1,7 @@
 import "server-only";
 
+import { runtimeMode } from "@/lib/runtime/mode";
+
 /**
  * Asset URL resolution (server only).
  *
@@ -15,7 +17,9 @@ export const MEDIA_ROUTE_PREFIX = "/media";
 export function getAssetUrl(key: string): string {
   const cleanKey = key.replace(/^\/+/, "");
   const encoded = cleanKey.split("/").map(encodeURIComponent).join("/");
-  const cdn = process.env.ASSET_CDN_URL?.trim().replace(/\/+$/, "");
+  // A CDN is only used in production; locally every asset comes from /media
+  // (the local media folder), never from production infrastructure.
+  const cdn = runtimeMode() === "production" ? process.env.ASSET_CDN_URL?.trim().replace(/\/+$/, "") : undefined;
   return cdn ? `${cdn}/${encoded}` : `${MEDIA_ROUTE_PREFIX}/${encoded}`;
 }
 
