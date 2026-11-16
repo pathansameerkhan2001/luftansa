@@ -149,6 +149,22 @@ export interface ProductOption {
   mrpInr?: number;
   /** Labels of confirmed offers that apply to this option. */
   offers?: readonly string[];
+  /** Configured stock. Undefined = not configured (the storefront then says nothing about stock). */
+  stockQuantity?: number;
+}
+
+/**
+ * Lowest selling price across the purchasable options (the "From" price on
+ * product cards), or undefined when there are none. Never synthesised.
+ */
+export function startingPrice(options: readonly Pick<ProductOption, "priceInr">[]): number | undefined {
+  if (options.length === 0) return undefined;
+  return Math.min(...options.map((o) => o.priceInr));
+}
+
+/** True when the options are not all the same price (cards then say "From"). */
+export function hasPriceRange(options: readonly Pick<ProductOption, "priceInr">[]): boolean {
+  return new Set(options.map((o) => o.priceInr)).size > 1;
 }
 
 function offersFor(offers: readonly ProductOffer[] | undefined, size?: BottleSizeMl): string[] | undefined {

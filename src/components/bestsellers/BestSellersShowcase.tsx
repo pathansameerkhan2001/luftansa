@@ -2,12 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageCircle, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
-import { AddToCartButton, PricePanel, SizePriceCards } from "@/components/pricing/PurchaseControls";
+import { PricePanel, SizePriceCards } from "@/components/pricing/PurchaseControls";
 import { formatInr, type ProductOption } from "@/data/products";
-import { dispatchAddToCart, dispatchWishlist } from "@/lib/cart-events";
+import { BUY_NOW_VIA_WHATSAPP } from "@/data/store";
+import { dispatchWishlist } from "@/lib/cart-events";
+import { whatsAppOrderHref } from "@/lib/storefront/whatsapp-order";
 
 type NoteTier = "top" | "middle" | "base";
 
@@ -149,17 +151,18 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
     }
   };
 
-  const addToCart = () => {
-    if (!selected) return;
-    dispatchAddToCart({
-      slug: item.slug,
-      name: item.name,
-      optionId: selected.id,
-      optionLabel: selected.label,
-      priceInr: selected.priceInr,
-    });
-    setStatus(`Online ordering is coming soon. Your selection: ${item.name}, ${selected.label}.`);
-  };
+  // No online cart yet: ordering goes through WhatsApp with the selection prefilled.
+  const orderHref =
+    selected && BUY_NOW_VIA_WHATSAPP
+      ? whatsAppOrderHref({
+          productName: item.name,
+          productId: item.slug,
+          variantId: selected.id,
+          variantLabel: selected.label,
+          unitPriceInr: selected.priceInr,
+          quantity: 1,
+        })
+      : undefined;
 
   const wishlist = () => {
     dispatchWishlist({ slug: item.slug, name: item.name });
@@ -352,12 +355,23 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
         ) : null}
 
         <div className="mt-3">
-          <AddToCartButton
-            onClick={addToCart}
-            disabled={!selected}
-            shape="feature"
-            srDetail={selected ? `${item.name}, ${selected.label}, ${formatInr(selected.priceInr)}` : undefined}
-          />
+          {orderHref && selected ? (
+            <a
+              href={orderHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-whatsapp-order
+              className="inline-flex h-12 w-full items-center justify-center gap-3 rounded-full bg-brand-black text-[15px] font-semibold tracking-[0.02em] text-white transition-colors duration-200 hover:bg-brand-text focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-gold"
+            >
+              <MessageCircle aria-hidden="true" className="size-5" strokeWidth={1.5} />
+              Order on WhatsApp
+              <span className="sr-only">
+                : {item.name}, {selected.label}, {formatInr(selected.priceInr)} (opens WhatsApp in a new tab)
+              </span>
+            </a>
+          ) : (
+            <p className="text-center text-[13px] text-brand-text/60">Online ordering is coming soon.</p>
+          )}
         </div>
         <p role="status" className="mt-2 min-h-[1.25rem] text-[12.5px] text-brand-text/70">
           {status}

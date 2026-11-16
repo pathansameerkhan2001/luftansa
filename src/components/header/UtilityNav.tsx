@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Heart, LayoutDashboard, ShoppingBag, User, type LucideIcon } from "lucide-react";
-import { UTILITY_LINKS } from "./nav-config";
+import { SHOW_CART_ICON, UTILITY_LINKS } from "./nav-config";
 import { SearchToggle } from "./SearchToggle";
 
 const LINKS: { label: string; href: string; Icon: LucideIcon; hideOnMobile?: boolean }[] = [
   { ...UTILITY_LINKS.account, Icon: User, hideOnMobile: true },
   { ...UTILITY_LINKS.wishlist, Icon: Heart, hideOnMobile: true },
-  { ...UTILITY_LINKS.cart, Icon: ShoppingBag },
+  // Hidden while there is no online cart/checkout (see SHOW_CART_ICON).
+  ...(SHOW_CART_ICON ? [{ ...UTILITY_LINKS.cart, Icon: ShoppingBag }] : []),
 ];
 
 export function UtilityNav() {

@@ -69,6 +69,8 @@ export function toStorefrontOptions(variants: readonly ProductVariantItem[]): Pr
         label: v.label || `${capacity} ${unit}`,
         priceInr: v.priceInr,
         mrpInr: v.mrpInr !== undefined && v.mrpInr > v.priceInr ? v.mrpInr : undefined,
+        // Only when the admin has configured it; unset stays unset.
+        ...(v.stockQuantity !== undefined ? { stockQuantity: v.stockQuantity } : {}),
       };
     });
 }

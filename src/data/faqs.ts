@@ -73,7 +73,7 @@ export const FAQS: readonly Faq[] = [
   {
     id: "order",
     question: "How can I place an order?",
-    answer: `Choose your fragrance and size on its product page and tap Buy Now to send your order to us on WhatsApp. You can also ${contactLine}. Online checkout is coming soon.`,
+    answer: `Choose your fragrance, size and quantity on its product page and tap Order on WhatsApp to send your order details to us on WhatsApp. You can also ${contactLine}. Online checkout is coming soon.`,
   },
   {
     id: "payments",
@@ -95,3 +95,12 @@ export const FAQS: readonly Faq[] = [
     pendingConfirmation: !(POLICIES.delivery && POLICIES.returns),
   },
 ];
+
+/** Existing FAQs shown on every product page: relevant to any fragrance, and no unconfirmed policy. */
+export const PRODUCT_PAGE_FAQ_IDS = ["notes", "apply", "order", "gifts"] as const;
+
+export function productPageFaqs(): Faq[] {
+  return PRODUCT_PAGE_FAQ_IDS.map((id) => FAQS.find((f) => f.id === id)).filter(
+    (f): f is Faq => f !== undefined && !f.pendingConfirmation,
+  );
+}

@@ -26,3 +26,6 @@ await jiti.import("./dynamic-product-management.test.ts");
 
 console.log("\nLoading catalogue-sync.test.ts via jiti...");
 await jiti.import("./catalogue-sync.test.ts");
+
+console.log("\nLoading product-experience.test.ts via jiti...");
+await jiti.import("./product-experience.test.ts");

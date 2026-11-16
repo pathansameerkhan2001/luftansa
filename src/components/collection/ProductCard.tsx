@@ -1,12 +1,8 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
-import { AddToCartButton, ImageSizeLabels, PricePanel } from "@/components/pricing/PurchaseControls";
-import { formatInr, type ProductOption } from "@/data/products";
-import { dispatchAddToCart, dispatchWishlist } from "@/lib/cart-events";
+import { formatInr, hasPriceRange, startingPrice, type ProductOption } from "@/data/products";
 import { RollOnBottleIcon } from "./icons";
 
 export type { ProductOption } from "@/data/products";
@@ -26,76 +22,67 @@ interface ProductCardProps {
   product: ProductCardData;
   /** Which line icon the neutral placeholder shows when no photograph exists. */
   placeholder?: PlaceholderKind;
+  /** Responsive `sizes` for the photograph (defaults suit the homepage carousels). */
+  imageSizes?: string;
 }
 
-export function ProductCard({ product, placeholder = "spray" }: ProductCardProps) {
-  const { slug, name, description, href, options, image } = product;
-  const [optionId, setOptionId] = useState<string | undefined>(options[0]?.id);
-  const [wishlisted, setWishlisted] = useState(false);
-  const [status, setStatus] = useState("");
-  const selected = options.find((o) => o.id === optionId);
+/**
+ * Browsing card: large photograph, name, optional description, starting price
+ * and a View Details call to action. The whole card opens the product page;
+ * size and quantity are chosen there. No purchase controls on the card.
+ */
+export function ProductCard({
+  product,
+  placeholder = "spray",
+  imageSizes = "(min-width: 1280px) 22vw, (min-width: 640px) 45vw, 85vw",
+}: ProductCardProps) {
+  const { name, description, href, options, image } = product;
+  const fromPrice = startingPrice(options);
+  const isRange = hasPriceRange(options);
   const PlaceholderIcon = placeholder === "roll-on" ? RollOnBottleIcon : PerfumeBottleIcon;
 
-  const addToCart = () => {
-    if (!selected) return;
-    dispatchAddToCart({ slug, name, optionId: selected.id, optionLabel: selected.label, priceInr: selected.priceInr });
-    setStatus("Online ordering is coming soon.");
-  };
-
-  const toggleWishlist = () => {
-    const next = !wishlisted;
-    setWishlisted(next);
-    dispatchWishlist({ slug, name, wishlisted: next });
-  };
-
   return (
-    <article className="flex h-full flex-col rounded-[22px] bg-white/80 p-2.5 shadow-[0_1px_2px_rgba(23,23,23,0.04),0_14px_30px_-14px_rgba(23,23,23,0.18)] ring-1 ring-brand-gold/15 sm:p-3">
-      {/* Image */}
-      <div data-carousel-media className="relative aspect-[6/5] overflow-hidden rounded-2xl bg-brand-cream">
+    <article
+      className={`group relative flex h-full flex-col rounded-[22px] bg-white/85 p-2.5 shadow-[0_1px_2px_rgba(23,23,23,0.04),0_14px_30px_-14px_rgba(23,23,23,0.18)] ring-1 ring-brand-gold/15 transition-[box-shadow,transform] duration-300 sm:p-3 ${
+        href
+          ? "hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(23,23,23,0.05),0_22px_40px_-18px_rgba(60,45,20,0.32)] hover:ring-brand-gold/40 motion-reduce:hover:translate-y-0 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-brand-gold"
+          : ""
+      }`}
+    >
+      {/* Photograph: fixed 4:5 frame, bottle shown whole (never cropped or stretched). */}
+      <div
+        data-carousel-media
+        className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-[radial-gradient(120%_85%_at_50%_38%,#ffffff_0%,var(--brand-ivory)_45%,var(--brand-cream)_100%)]"
+      >
         {image ? (
           <Image
             src={image.src}
             alt={image.alt}
             fill
-            sizes="(min-width: 1280px) 22vw, (min-width: 640px) 45vw, 85vw"
-            className="object-cover"
+            sizes={imageSizes}
+            className="object-contain p-5 transition-transform duration-500 ease-out group-hover:scale-[1.035] motion-reduce:transition-none motion-reduce:group-hover:scale-100 sm:p-6"
             style={{ objectPosition: image.objectPosition ?? "50% 50%" }}
           />
         ) : (
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_35%,var(--brand-ivory)_0%,var(--brand-cream)_70%)]"
-          >
+          <div aria-hidden="true" className="absolute inset-0">
             <div className="absolute inset-3 rounded-xl border border-brand-gold/30" />
             <PlaceholderIcon
-              className="absolute top-1/2 left-1/2 size-14 -translate-x-1/2 -translate-y-1/2 text-brand-gold/50"
-              strokeWidth={0.75}
+              className="absolute top-1/2 left-1/2 size-16 -translate-x-1/2 -translate-y-[60%] text-brand-gold/55 sm:size-20"
+              strokeWidth={0.7}
             />
+            <span className="absolute inset-x-0 bottom-7 text-center text-[10.5px] font-medium tracking-[0.22em] text-brand-text/45 uppercase">
+              Photograph coming soon
+            </span>
           </div>
         )}
-
-        {/* Available sizes, presented on the product artwork (also the size selector). */}
-        {selected ? (
-          <ImageSizeLabels
-            options={options}
-            selectedId={selected.id}
-            onSelect={(id) => {
-              setOptionId(id);
-              setStatus("");
-            }}
-            label={`Choose a size for ${name}`}
-          />
-        ) : null}
       </div>
 
       {/* Details */}
-      <div className="flex flex-1 flex-col px-1.5 pt-3.5 pb-1.5 sm:px-2.5 sm:pt-4 sm:pb-1.5">
-        <h3 className="font-serif lining-nums text-[22px] leading-tight font-semibold text-brand-black sm:text-[23px]">
+      <div className="flex flex-1 flex-col px-1.5 pt-4 pb-1.5 sm:px-2.5 sm:pt-5">
+        <h3 className="font-serif lining-nums text-[22px] leading-tight font-semibold text-brand-black sm:text-[24px]">
           {href ? (
-            <Link
-              href={href}
-              className="decoration-brand-gold/70 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold"
-            >
+            // Stretched link: the whole card is clickable, with one tab stop.
+            <Link href={href} className="outline-none after:absolute after:inset-0 after:rounded-[22px] after:content-['']">
               {name}
             </Link>
           ) : (
@@ -103,28 +90,35 @@ export function ProductCard({ product, placeholder = "spray" }: ProductCardProps
           )}
         </h3>
         {description ? (
-          <p className="mt-1.5 text-[14px] leading-relaxed text-brand-text/75">{description}</p>
+          <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-brand-text/75">{description}</p>
         ) : null}
 
-        {selected ? (
-          <>
-            <div className="mt-auto pt-3.5">
-              <PricePanel option={selected} productName={name} wishlisted={wishlisted} onWishlist={toggleWishlist} />
-            </div>
-
-            <div className="mt-3">
-              <AddToCartButton
-                onClick={addToCart}
-                srDetail={`${name}, ${selected.label}, ${formatInr(selected.priceInr)}`}
-              />
-            </div>
-            <p role="status" className="mt-2 min-h-[1rem] text-center text-[12px] text-brand-text/65">
-              {status}
+        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+          {fromPrice !== undefined ? (
+            <p className="leading-none">
+              {isRange ? (
+                <span className="mb-1.5 block text-[10.5px] font-semibold tracking-[0.18em] text-brand-text/55 uppercase">
+                  From
+                </span>
+              ) : null}
+              <span className="font-sans text-[21px] font-bold tracking-[-0.01em] text-brand-black lining-nums sm:text-[22px]">
+                {formatInr(fromPrice)}
+              </span>
             </p>
-          </>
-        ) : (
-          <p className="mt-auto pt-5 text-[13px] text-brand-text/60">Sizes &amp; pricing coming soon</p>
-        )}
+          ) : (
+            <p className="text-[13px] text-brand-text/60">Sizes &amp; pricing coming soon</p>
+          )}
+
+          {href ? (
+            <span
+              aria-hidden="true"
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-brand-black px-4 text-[13px] font-medium tracking-[0.02em] text-brand-black transition-colors duration-200 group-hover:bg-brand-black group-hover:text-white"
+            >
+              View Details
+              <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={1.75} />
+            </span>
+          ) : null}
+        </div>
       </div>
     </article>
   );

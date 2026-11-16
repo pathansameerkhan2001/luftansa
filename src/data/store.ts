@@ -53,7 +53,7 @@ export const POLICIES: {
 } = {};
 
 /**
- * Buy Now behaviour while there is no online checkout: open WhatsApp with a
+ * Ordering while there is no online checkout ("Order on WhatsApp"): open WhatsApp with a
  * prefilled order message to the confirmed store number. Set to false to fall
  * back to a "coming soon" notice instead.
  */

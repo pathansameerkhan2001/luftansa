@@ -12,6 +12,13 @@ export const PRIMARY_NAV: readonly NavItem[] = [
   { label: "Contact Us", href: "/contact" },
 ];
 
+/**
+ * The header cart icon stays hidden until an online cart and checkout exist
+ * (ordering is currently done on WhatsApp from each product page). Set to true
+ * only once /cart is a working page.
+ */
+export const SHOW_CART_ICON = false;
+
 export const UTILITY_LINKS = {
   search: { label: "Search", href: "/search" },
   account: { label: "Account", href: "/account" },

@@ -15,6 +15,8 @@
 export interface CollectionCandidate {
   slug: string;
   name: string;
+  /** Product category (e.g. "Perfume"); used for related products. */
+  category?: string;
   collections: readonly string[];
   bestseller: boolean;
   displayOrder?: number;
@@ -44,4 +46,21 @@ export function selectPersonality<T extends CollectionCandidate>(products: reado
 
 export function selectBestSellers<T extends CollectionCandidate>(products: readonly T[]): T[] {
   return sortByDisplayOrder(products.filter((p) => p.bestseller));
+}
+
+/**
+ * Related products for a product detail page: other products that share a
+ * homepage collection (or the Best Sellers group) first, then products of the
+ * same category. The current product is never included. Within each group the
+ * storefront display order is kept.
+ */
+export function selectRelated<T extends CollectionCandidate>(products: readonly T[], current: T, limit = 4): T[] {
+  const others = sortByDisplayOrder(products.filter((p) => p.slug !== current.slug));
+  const sharesCollection = (p: T) =>
+    p.collections.some((c) => current.collections.includes(c)) || (current.bestseller && p.bestseller);
+  const sameCategory = (p: T) => Boolean(current.category) && p.category === current.category;
+
+  const first = others.filter(sharesCollection);
+  const second = others.filter((p) => !sharesCollection(p) && sameCategory(p));
+  return [...first, ...second].slice(0, Math.max(0, limit));
 }
