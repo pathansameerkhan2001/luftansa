@@ -29,3 +29,6 @@ await jiti.import("./catalogue-sync.test.ts");
 
 console.log("\nLoading product-experience.test.ts via jiti...");
 await jiti.import("./product-experience.test.ts");
+
+console.log("\nLoading cms-foundation.test.ts via jiti...");
+await jiti.import("./cms-foundation.test.ts");

@@ -1,3 +1,4 @@
+import { isLocalUrl, runtimeMode, type RuntimeMode } from "@/lib/runtime/mode";
 import { parseAdminEmails } from "./admin-emails";
 
 /**
@@ -69,6 +70,7 @@ export function getAuthConfig(): AuthConfig {
   // The issuer is derived from region + pool. COGNITO_ISSUER may override it
   // (only needed for automated tests against a local mock identity provider).
   const issuer = (process.env.COGNITO_ISSUER?.trim() || `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`).replace(/\/+$/, "");
+  assertAuthEndpointsForRuntime({ domain, issuer, redirectUri, logoutRedirectUri }, runtimeMode());
   const maxAge = Number(process.env.AUTH_SESSION_MAX_AGE ?? 12 * 60 * 60);
 
   cached = {
@@ -85,4 +87,30 @@ export function getAuthConfig(): AuthConfig {
     secureCookies: new URL(redirectUri).protocol === "https:",
   };
   return cached;
+}
+
+const COGNITO_ISSUER = /^https:\/\/cognito-idp\.[a-z0-9-]+\.amazonaws\.com\/[A-Za-z0-9_-]+$/;
+
+/**
+ * Production guard for the local mock identity provider (scripts/local/mock-idp.mjs).
+ * In the production runtime every auth endpoint must be https and non-local,
+ * and the token issuer must be a real Cognito user pool. A localhost/mock
+ * issuer, domain or redirect can therefore never be activated in production,
+ * even if such values were set by mistake. Locally, localhost is allowed.
+ */
+export function assertAuthEndpointsForRuntime(
+  endpoints: { domain: string; issuer: string; redirectUri: string; logoutRedirectUri: string },
+  mode: RuntimeMode,
+): void {
+  if (mode !== "production") return;
+  for (const [name, value] of Object.entries(endpoints)) {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new AuthConfigError(`${name} is not a valid URL`);
+    }
+    if (url.protocol !== "https:" || isLocalUrl(value)) throw new AuthConfigError(`${name} must be a public https URL in production`);
+  }
+  if (!COGNITO_ISSUER.test(endpoints.issuer)) throw new AuthConfigError("COGNITO_ISSUER must be a Cognito user pool issuer in production");
 }

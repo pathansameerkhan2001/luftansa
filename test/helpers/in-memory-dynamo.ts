@@ -116,6 +116,12 @@ export class InMemoryDynamoClient {
       if (cond === "attribute_not_exists(pk)" && existing) {
         throw new ConditionalFailure("Item already exists");
       }
+      // Optimistic concurrency (Repository.replace), as DynamoDB evaluates it.
+      if (cond?.includes("attribute_exists(pk) AND #v = :expected")) {
+        if (!existing || existing.version !== command.input.ExpressionAttributeValues?.[":expected"]) {
+          throw new ConditionalFailure("Version mismatch");
+        }
+      }
       this.tables.get(tName)!.set(keyStr, JSON.parse(JSON.stringify(item)));
       return {};
     }
@@ -132,6 +138,12 @@ export class InMemoryDynamoClient {
       const tName = command.input.TableName!;
       const key = command.input.Key!;
       const keyStr = `${key.pk}##${key.sk}`;
+      const existingItem = this.tables.get(tName)?.get(keyStr);
+      const delCond = command.input.ConditionExpression;
+      if (delCond?.includes("attribute_exists(pk)") && !existingItem) throw new ConditionalFailure("Item not found");
+      if (delCond?.includes("#v = :expected") && existingItem?.version !== command.input.ExpressionAttributeValues?.[":expected"]) {
+        throw new ConditionalFailure("Version mismatch");
+      }
       this.tables.get(tName)?.delete(keyStr);
       return {};
     }

@@ -72,6 +72,35 @@ export function resolveAuthorizedActor(actor: string | undefined, rawAllowlist: 
   return normalized;
 }
 
+export const CONFIRM_PRODUCTION_WRITE_FLAG = "--confirm-production-write";
+
+export type ImportMode = { mode: "dry-run" } | { mode: "apply"; actor: string };
+
+/**
+ * Decides whether the import CLI may write (pure; evaluated before any AWS
+ * client is created). Writing to production requires ALL of:
+ *   --apply
+ *   --confirm-production-write
+ *   --actor <email> on the ADMIN_EMAILS allow-list (resolveAuthorizedActor)
+ * Anything less is a read-only dry run or an error, never a write.
+ */
+export function resolveImportMode(argv: readonly string[], rawAllowlist: string | undefined): ImportMode {
+  const apply = argv.includes("--apply");
+  const confirmed = argv.includes(CONFIRM_PRODUCTION_WRITE_FLAG);
+  if (!apply && confirmed) {
+    throw new UnauthorizedActorError(`${CONFIRM_PRODUCTION_WRITE_FLAG} is only valid together with --apply.`);
+  }
+  if (!apply) return { mode: "dry-run" };
+  if (!confirmed) {
+    throw new UnauthorizedActorError(
+      `--apply writes to PRODUCTION DynamoDB. Re-run with ${CONFIRM_PRODUCTION_WRITE_FLAG} to confirm (a dry run needs no flags).`,
+    );
+  }
+  const actorIdx = argv.indexOf("--actor");
+  const actor = actorIdx >= 0 ? argv[actorIdx + 1] : undefined;
+  return { mode: "apply", actor: resolveAuthorizedActor(actor?.startsWith("--") ? undefined : actor, rawAllowlist) };
+}
+
 /** Builds the import plan using reads only (GetItem + GSI1 Query). */
 export async function planCatalogueImport(repo: Repository, now = new Date().toISOString()): Promise<ImportPlan> {
   const productType = await repo.get(keys.productType(LEGACY_PRODUCT_TYPE_ID), productTypeItemSchema);

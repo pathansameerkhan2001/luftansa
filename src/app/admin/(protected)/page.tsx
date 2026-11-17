@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Database,
   History,
+  ImageIcon,
   Lock,
   Package,
   Server,
@@ -132,11 +133,11 @@ export default async function AdminDashboardPage() {
                 <ArrowRight aria-hidden="true" className="size-3.5" />
               </Link>
               <Link
-                href="/admin/inventory"
+                href="/admin/media"
                 className="inline-flex items-center gap-2 rounded-xl border border-[#c6a76a]/40 bg-white/5 px-4 py-3 text-[14px] font-medium text-[#f8f5ec] backdrop-blur-sm transition-colors hover:border-[#c6a76a]/70 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c6a76a]"
               >
-                <Boxes aria-hidden="true" className="size-4 text-[#c6a76a]" strokeWidth={1.8} />
-                <span>Stock &amp; Inventory</span>
+                <ImageIcon aria-hidden="true" className="size-4 text-[#c6a76a]" strokeWidth={1.8} />
+                <span>Media Library</span>
               </Link>
             </div>
           </div>
@@ -260,15 +261,9 @@ export default async function AdminDashboardPage() {
               </p>
             </div>
           </div>
-          <div className="border-t border-[#f0e6d2] pt-4">
-            <Link
-              href="/admin/orders"
-              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-black transition-colors hover:text-brand-gold"
-            >
-              <span>View Orders Roadmap</span>
-              <ArrowRight aria-hidden="true" className="size-3.5" />
-            </Link>
-          </div>
+          <p className="border-t border-[#f0e6d2] pt-4 text-[12.5px] text-brand-text/60">
+            Orders appear here once online checkout exists. Today, orders arrive on WhatsApp.
+          </p>
         </section>
 
         <section

@@ -4,10 +4,11 @@
  *   PRODUCT#<id>   META | VARIANT#<ml> | STOCK#<iso>#<uid>
  *   ORDER#<id>     META | ITEM#<n> | EVENT#<iso>#<uid>
  *   CUSTOMER#<id>  PROFILE | ORDER#<iso>#<orderId>
- *   CONTENT#<sec>  PUBLISHED | DRAFT | V#<n>
+ *   CONTENT#<module>  ENTRY#<id>        (CMS entries, Phase 3)
+ *   CONTENT#<sec>  PUBLISHED | DRAFT | V#<n>  (reserved, unused)
  *   SETTINGS       STORE | SHIPPING | SOCIAL | CONTACT
  *   PROMO#<id>     META
- *   MEDIA#<id>     META
+ *   MEDIA#<id>     META   (+ GSI1: MEDIA / UPLOADED#<iso>#<id>)
  *   STATS          COUNTERS
  *   AUDIT#<yyyy-mm> <iso>#<uid>
  *
@@ -77,6 +78,10 @@ export const keys = {
   settings: (name: "STORE" | "SHIPPING" | "SOCIAL" | "CONTACT"): ItemKey => ({ pk: "SETTINGS", sk: name }),
   promo: (id: string): ItemKey => ({ pk: `PROMO#${assertId(id)}`, sk: "META" }),
   media: (id: string): ItemKey => ({ pk: `MEDIA#${assertId(id)}`, sk: "META" }),
+  /** Media library listing on the existing GSI1 (no new index). */
+  mediaGsi1: (uploadedAtIso: string, id: string) => ({ GSI1PK: "MEDIA" as const, GSI1SK: `UPLOADED#${uploadedAtIso}#${assertId(id)}` }),
+  contentEntry: (module: string, id: string): ItemKey => ({ pk: `CONTENT#${assertId(module, "module")}`, sk: `ENTRY#${assertId(id)}` }),
+  contentPartition: (module: string): string => `CONTENT#${assertId(module, "module")}`,
   stats: (): ItemKey => ({ pk: "STATS", sk: "COUNTERS" }),
   audit: (at: Date, uid: string): ItemKey => ({
     pk: `AUDIT#${iso(at).slice(0, 7)}`,
@@ -93,4 +98,5 @@ export const SK_PREFIX = {
   orderItem: "ITEM#",
   orderEvent: "EVENT#",
   customerOrder: "ORDER#",
+  contentEntry: "ENTRY#",
 } as const;

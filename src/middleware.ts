@@ -68,7 +68,11 @@ function noStore(res: NextResponse) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  // The multipart upload endpoint is excluded: cloning a large request body
+  // for in-process Node.js middleware races in Next.js 15.5 ("Response body
+  // object should not be disturbed or locked"). That route still verifies the
+  // admin session and same-origin itself (withAdmin), like every admin API.
+  matcher: ["/admin/:path*", "/api/admin", "/api/admin/((?!media/upload$).*)"],
   // Node.js runtime (stable in Next.js 15.5): same crypto/runtime as the auth route handlers.
   runtime: "nodejs",
 };

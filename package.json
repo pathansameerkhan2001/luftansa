@@ -8,7 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node test/run-tests.mjs",
-    "catalogue:import": "node scripts/import-catalogue.mjs"
+    "catalogue:import": "node scripts/import-catalogue.mjs",
+    "local:db": "node scripts/local/dynamodb-local.mjs",
+    "local:idp": "node scripts/local/mock-idp.mjs",
+    "local:setup": "node scripts/local/setup.mjs",
+    "local:dev": "node scripts/local/run.mjs dev",
+    "local:start": "node scripts/local/run.mjs start"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1167.0",
