@@ -5,7 +5,7 @@ import { mkdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3ServiceException } from "@aws-sdk/client-s3";
-import { runtimeMode } from "@/lib/runtime/mode";
+import { deploymentEnv, previewStorageProblems, warnPreviewIsolation } from "@/lib/runtime/preview-isolation";
 import { getS3Client, getS3Config, isAllowedAssetKey } from "@/lib/s3";
 import type { ByteRange } from "./range";
 
@@ -160,16 +160,36 @@ class S3MediaStorage implements MediaStorage {
 
 /* --------------------------------------------------------------- selector --- */
 
+export type MediaStorageChoice = { kind: "s3" } | { kind: "local"; dir: string } | { kind: "none"; reason: string };
+
+/**
+ * Which storage this runtime uses (pure, testable):
+ *   - Vercel production: S3 (unchanged).
+ *   - Vercel Preview: S3 only with an isolated Preview bucket and role; otherwise
+ *     none, so uploads and deletions are refused instead of reaching production.
+ *   - local: LOCAL_MEDIA_DIR, or none.
+ */
+export function selectMediaStorage(env: Record<string, string | undefined> = process.env): MediaStorageChoice {
+  const deployment = deploymentEnv(env);
+  if (deployment === "production") return { kind: "s3" };
+  if (deployment === "preview") {
+    const problems = previewStorageProblems(env);
+    if (problems.length > 0) {
+      warnPreviewIsolation("media storage", problems);
+      return { kind: "none", reason: `Preview isolation: ${problems.join("; ")}` };
+    }
+    return { kind: "s3" };
+  }
+  const dir = env.LOCAL_MEDIA_DIR?.trim();
+  return dir ? { kind: "local", dir } : { kind: "none", reason: "LOCAL_MEDIA_DIR is not set" };
+}
+
 let cached: MediaStorage | null | undefined;
 
-/** The media storage for this runtime, or null when none is configured locally. */
+/** The media storage for this runtime, or null when none is configured. */
 export function getMediaStorage(): MediaStorage | null {
   if (cached !== undefined) return cached;
-  if (runtimeMode() === "production") {
-    cached = new S3MediaStorage();
-  } else {
-    const dir = process.env.LOCAL_MEDIA_DIR?.trim();
-    cached = dir ? new LocalMediaStorage(dir) : null;
-  }
+  const choice = selectMediaStorage();
+  cached = choice.kind === "s3" ? new S3MediaStorage() : choice.kind === "local" ? new LocalMediaStorage(choice.dir) : null;
   return cached;
 }

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Clapperboard, Copy, FileImage, HardDrive, ImageIcon, Info, Trash2, UploadCloud, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
-import { compressImageForUpload } from "@/lib/media/compress-image";
+import { formatBytes, UPLOAD_ACCEPT, uploadToMediaLibrary, type UploadedMedia } from "@/lib/media/client-upload";
 import {
   ADMIN_FOCUS, adminFetch, BTN_PRIMARY, BTN_SECONDARY, ConfirmDialog, EmptyState, FeedbackBanner, FilterTabs, INPUT, PageIntro, SearchField, Spinner, StatusBadge, useFeedback,
 } from "@/components/admin/cms/ui";
@@ -43,39 +43,11 @@ type Selected = { type: "record"; id: string } | { type: "uncatalogued"; key: st
 const FOLDER_LABELS: Record<string, string> = {
   general: "General", hero: "Hero", banners: "Banners", about: "About Us", lab: "Inside the Lab", manufacturing: "Manufacturing", videos: "Videos",
 };
-const ACCEPT = "image/jpeg,image/png,image/webp,video/mp4,video/webm";
-const MAX_SOURCE_IMAGE = 40 * 1024 * 1024;
+const ACCEPT = UPLOAD_ACCEPT;
 
-const mb = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const mb = formatBytes;
 const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" });
 const fileName = (key: string) => key.split("/").pop() ?? key;
-
-async function measure(file: File): Promise<{ width?: number; height?: number; durationSeconds?: number }> {
-  try {
-    if (file.type.startsWith("image/")) {
-      const bmp = await createImageBitmap(file);
-      const out = { width: bmp.width, height: bmp.height };
-      bmp.close();
-      return out;
-    }
-    const url = URL.createObjectURL(file);
-    try {
-      const v = document.createElement("video");
-      v.preload = "metadata";
-      v.muted = true;
-      v.src = url;
-      await new Promise<void>((resolve, reject) => {
-        v.onloadedmetadata = () => resolve();
-        v.onerror = () => reject(new Error("metadata"));
-      });
-      return { width: v.videoWidth || undefined, height: v.videoHeight || undefined, durationSeconds: Number.isFinite(v.duration) ? Math.round(v.duration * 10) / 10 : undefined };
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  } catch {
-    return {};
-  }
-}
 
 /* -------------------------------------------------------------- component --- */
 
@@ -112,23 +84,7 @@ export function MediaLibrary() {
     for (const [i, file] of list.entries()) {
       const setState = (state: "done" | "error", message?: string) => setUploads((u) => u.map((x, j) => (j === i ? { ...x, state, message } : x)));
       try {
-        if (!ACCEPT.split(",").includes(file.type)) throw new Error("Only JPEG, PNG, WebP, MP4 or WebM files.");
-        let prepared: File = file;
-        if (file.type.startsWith("image/")) {
-          if (file.size > MAX_SOURCE_IMAGE) throw new Error("Please choose an image under 40 MB.");
-          prepared = await compressImageForUpload(file, data.environment.limits.imageBytes);
-        } else if (file.size > data.environment.limits.videoBytes) {
-          throw new Error(`Videos are limited to ${mb(data.environment.limits.videoBytes)} until direct uploads are approved.`);
-        }
-        const dims = await measure(prepared);
-        const form = new FormData();
-        form.append("file", prepared, prepared.name || file.name);
-        form.append("target", "library");
-        form.append("folder", folder);
-        if (dims.width) form.append("width", String(dims.width));
-        if (dims.height) form.append("height", String(dims.height));
-        if (dims.durationSeconds) form.append("durationSeconds", String(dims.durationSeconds));
-        await adminFetch("/api/admin/media/upload", { method: "POST", body: form });
+        await uploadToMediaLibrary(file, folder, data.environment.limits, (form) => adminFetch<UploadedMedia>("/api/admin/media/upload", { method: "POST", body: form }));
         ok++;
         setState("done");
       } catch (e) {

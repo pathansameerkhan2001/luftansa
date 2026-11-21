@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AnnouncementBar } from "./AnnouncementBar";
 import { BrandLogo } from "./BrandLogo";
 import { DesktopNav } from "./DesktopNav";
@@ -8,8 +9,9 @@ import { UtilityNav } from "./UtilityNav";
  * Site header: announcement bar → centred brand logo → navigation row.
  * Server Component; only DesktopNav (active-link state) and MobileMenu
  * (drawer state) ship client JavaScript.
+ * `announcement` replaces the live announcement bar (admin previews only).
  */
-export function SiteHeader() {
+export function SiteHeader({ announcement }: { announcement?: ReactNode } = {}) {
   return (
     <header className="w-full">
       <a
@@ -19,7 +21,7 @@ export function SiteHeader() {
         Skip to content
       </a>
 
-      <AnnouncementBar />
+      {announcement === undefined ? <AnnouncementBar /> : announcement}
       <BrandLogo />
 
       <div className="relative border-y border-brand-gold/25 bg-brand-ivory">

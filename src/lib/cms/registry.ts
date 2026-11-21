@@ -1,14 +1,23 @@
 /**
- * Registered CMS modules. Phase 3A ships the foundation only; modules
- * (announcement bar, hero, homepage sections, …) are registered from Phase 3B.
- * The generic admin API answers 404 for any module not listed here.
+ * Registered CMS modules. Each Phase 3B page registers its module here as it
+ * is built. The generic admin API answers 404 for any module not listed, and
+ * the Media Library's "where used" check scans every module listed here.
  */
+import { ANNOUNCEMENT_MODULE } from "./modules/announcement-bar";
+import { HERO_MODULE } from "./modules/hero";
 import type { CmsModuleDefinition } from "./schemas";
 
-export const CMS_MODULES: readonly CmsModuleDefinition[] = [];
+export const CMS_MODULES: readonly CmsModuleDefinition[] = [HERO_MODULE, ANNOUNCEMENT_MODULE];
 
 export function getCmsModule(id: string, modules: readonly CmsModuleDefinition[] = CMS_MODULES): CmsModuleDefinition | undefined {
   return modules.find((m) => m.id === id);
 }
 
 export const cmsTag = (moduleId: string) => `cms:${moduleId}`;
+/**
+ * Second tag on the same content, used only by the follow-up revalidation
+ * (src/lib/cms/loader.ts). It must differ from cmsTag: Next.js ignores a
+ * revalidation of a tag that is already pending in the same request, which
+ * includes work scheduled with `after`.
+ */
+export const cmsFollowUpTag = (moduleId: string) => `cms:${moduleId}:follow-up`;
