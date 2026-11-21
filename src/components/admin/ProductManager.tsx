@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   AlertCircle,
   Check,
+  FileSpreadsheet,
   CheckCircle2,
   ImageIcon,
   Leaf,
@@ -846,6 +848,14 @@ export function ProductManager({
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
+          <Link
+            href="/admin/products/import"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#E8E4DA] bg-white px-3 py-2 text-xs font-medium text-[#292D27] shadow-sm transition hover:bg-[#F8F5EC]"
+            data-action="import-excel"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-[#8C6D37]" />
+            Import Excel
+          </Link>
           <button
             onClick={openCreateModal}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#171717] px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-[#292D27]"

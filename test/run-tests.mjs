@@ -41,3 +41,6 @@ await jiti.import("./announcement-bar.test.ts");
 
 console.log("\nLoading preview-isolation.test.ts via jiti...");
 await jiti.import("./preview-isolation.test.ts");
+
+console.log("\nLoading excel-import.test.ts via jiti...");
+await jiti.import("./excel-import.test.ts");
