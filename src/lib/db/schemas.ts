@@ -108,11 +108,14 @@ export const fragranceNoteItemSchema = z.object({
 });
 export type FragranceNoteItem = z.infer<typeof fragranceNoteItemSchema>;
 
-/** Three distinct fragrance note groups: Top, Heart and Base (max 10 each) */
+/** Maximum notes per group (Top, Heart/Middle, Base). Raised from 10 to 12 (e.g. Afghan Tiger has 11 Base notes). */
+export const MAX_NOTES_PER_GROUP = 12;
+
+/** Three distinct fragrance note groups: Top, Heart and Base (max MAX_NOTES_PER_GROUP each) */
 export const fragranceNotesSchema = z.object({
-  top: z.array(fragranceNoteItemSchema).max(10).default([]),
-  heart: z.array(fragranceNoteItemSchema).max(10).default([]),
-  base: z.array(fragranceNoteItemSchema).max(10).default([]),
+  top: z.array(fragranceNoteItemSchema).max(MAX_NOTES_PER_GROUP).default([]),
+  heart: z.array(fragranceNoteItemSchema).max(MAX_NOTES_PER_GROUP).default([]),
+  base: z.array(fragranceNoteItemSchema).max(MAX_NOTES_PER_GROUP).default([]),
 });
 export type FragranceNotes = z.infer<typeof fragranceNotesSchema>;
 

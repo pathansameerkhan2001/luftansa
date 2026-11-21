@@ -31,6 +31,8 @@ import type {
   StorefrontCollection,
   VerifiableField,
 } from "@/lib/db/schemas";
+import { MAX_NOTES_PER_GROUP } from "@/lib/db/schemas";
+import { DEFAULT_ROLL_ON_SIZE_ML, FORMAT_LABEL, PERFUME_TYPE_ID, perfumesWithRollOnSizes, productFormat, productIdFor, ROLL_ON_TYPE_ID, SECTION_LABEL, type ProductFormat } from "@/lib/catalogue/product-format";
 import { compressImageForUpload } from "@/lib/media/compress-image";
 import { formatMegabytes, isAllowedImageType, MAX_SOURCE_BYTES } from "@/lib/media/upload-limits";
 
@@ -101,8 +103,12 @@ function toVariantRows(variants: ProductVariantItem[]): VariantFormRow[] {
     }));
 }
 
-function defaultVariantRows(): VariantFormRow[] {
+/** Default variants for a new product: Perfume sprays 30/50/100 ml (standard prices); a Roll-On one 8 ml size (price to be entered). */
+function defaultVariantRows(productTypeId: string = PERFUME_TYPE_ID): VariantFormRow[] {
   const stamp = Date.now().toString(36);
+  if (productFormat(productTypeId) === "roll-on") {
+    return [{ id: `v_${stamp}_1`, capacity: DEFAULT_ROLL_ON_SIZE_ML, unit: "ml", label: `${DEFAULT_ROLL_ON_SIZE_ML} ml`, priceInr: 0, stockQuantity: null, sku: "", status: "ACTIVE" }];
+  }
   return [30, 50, 100].map((ml, i) => ({
     id: `v_${stamp}_${i + 1}`,
     capacity: ml,
@@ -155,6 +161,8 @@ export function ProductManager({
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  /** Product section shown in the list: Perfumes, Roll-On, other types, or everything. */
+  const [sectionFilter, setSectionFilter] = useState<"all" | ProductFormat>("all");
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -390,6 +398,7 @@ export function ProductManager({
 
   // Fragrance Notes Management
   const addNoteToTier = (tier: "top" | "heart" | "base") => {
+    if (notes[tier].length >= MAX_NOTES_PER_GROUP) return;
     const newNote: FragranceNoteItem = {
       id: `${tier}-note-${Date.now()}`,
       name: "",
@@ -439,13 +448,13 @@ export function ProductManager({
     }
   };
 
-  const openCreateModal = () => {
+  const openCreateModal = (typeId: string = PERFUME_TYPE_ID) => {
     setModalMode("CREATE");
     setActiveProduct(null);
     setFormName("");
     setFormId("");
     setFormDescription("");
-    const defaultType = productTypes[0] || { id: "perfume-spray", name: "Perfume Spray", defaultUnit: "ml", hasNotes: true };
+    const defaultType = productTypes.find((t) => t.id === typeId) || productTypes[0] || { id: PERFUME_TYPE_ID, name: "Perfume Spray", defaultUnit: "ml", hasNotes: true };
     setFormProductTypeId(defaultType.id);
     setFormCategory(defaultType.name);
     setNotesEnabled(defaultType.hasNotes);
@@ -465,7 +474,7 @@ export function ProductManager({
     setKeywordInput("");
     setNotes({ top: [], heart: [], base: [] });
 
-    setVariantsList(defaultVariantRows());
+    setVariantsList(defaultVariantRows(defaultType.id));
 
     setIsModalOpen(true);
     setErrorMessage(null);
@@ -545,7 +554,8 @@ export function ProductManager({
   const handleNameChange = (val: string) => {
     setFormName(val);
     if (modalMode === "CREATE") {
-      setFormId(slugify(val));
+      // A Roll-On gets its own web address ("black-velvet-roll-on"), separate from the Perfume.
+      setFormId(productIdFor(slugify(val), formProductTypeId));
     }
   };
 
@@ -815,10 +825,18 @@ export function ProductManager({
       p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.keywords && p.keywords.some((k) => k.toLowerCase().includes(searchTerm.toLowerCase())));
     const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesSection = sectionFilter === "all" || productFormat(p.productTypeId) === sectionFilter;
+    return matchesSearch && matchesStatus && matchesSection;
   });
 
-  const totalActive = products.filter((p) => p.status === "ACTIVE").length;
+  const countBy = (f: ProductFormat, activeOnly = false) =>
+    products.filter((p) => productFormat(p.productTypeId) === f && (!activeOnly || p.status === "ACTIVE")).length;
+  const sectionTabs: { id: "all" | ProductFormat; label: string; count: number }[] = [
+    { id: "perfume", label: SECTION_LABEL.perfume, count: countBy("perfume") },
+    { id: "roll-on", label: SECTION_LABEL["roll-on"], count: countBy("roll-on") },
+    ...(countBy("other") > 0 ? [{ id: "other" as const, label: SECTION_LABEL.other, count: countBy("other") }] : []),
+    { id: "all", label: "All", count: products.length },
+  ];
 
   return (
     <div className="space-y-6">
@@ -834,11 +852,11 @@ export function ProductManager({
             </span>
           </div>
           <p className="mt-1 text-sm text-[#57534E]">
-            Manage products, S3 photography, bottle variants (30 ml, 50 ml, 100 ml), keywords and fragrance notes.
+            Perfumes (spray sizes 30 ml, 50 ml, 100 ml) and Roll-Ons (8 ml) are separate products, each with its own photos, prices, SKUs, stock and status.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={refreshProducts}
             disabled={loading}
@@ -857,11 +875,20 @@ export function ProductManager({
             Import Excel
           </Link>
           <button
-            onClick={openCreateModal}
+            onClick={() => openCreateModal(ROLL_ON_TYPE_ID)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#171717] bg-white px-3 py-2 text-xs font-semibold text-[#171717] shadow-sm transition hover:bg-[#F8F5EC]"
+            data-action="new-roll-on"
+          >
+            <Plus className="h-4 w-4 text-[#8C6D37]" />
+            New Roll-On
+          </button>
+          <button
+            onClick={() => openCreateModal(PERFUME_TYPE_ID)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#171717] px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-[#292D27]"
+            data-action="new-perfume"
           >
             <Plus className="h-4 w-4 text-[#C6A76A]" />
-            New Fragrance
+            New Perfume
           </button>
         </div>
       </div>
@@ -890,27 +917,27 @@ export function ProductManager({
       {/* Metrics Bar */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-4 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-wider text-[#78716C]">Total Fragrances</div>
-          <div className="mt-2 text-2xl font-bold text-[#171717]">{products.length}</div>
-          <div className="mt-1 text-xs text-[#78716C]">In DynamoDB partition</div>
+          <div className="text-xs font-medium uppercase tracking-wider text-[#78716C]">Perfumes</div>
+          <div className="mt-2 text-2xl font-bold text-[#171717]">{countBy("perfume")}</div>
+          <div className="mt-1 text-xs text-[#78716C]">{countBy("perfume", true)} visible on storefront</div>
         </div>
 
         <div className="rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-4 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-wider text-[#78716C]">Active Fragrances</div>
-          <div className="mt-2 text-2xl font-bold text-emerald-700">{totalActive}</div>
-          <div className="mt-1 text-xs text-[#78716C]">Visible on storefront</div>
+          <div className="text-xs font-medium uppercase tracking-wider text-[#78716C]">Roll-On</div>
+          <div className="mt-2 text-2xl font-bold text-[#171717]">{countBy("roll-on")}</div>
+          <div className="mt-1 text-xs text-[#78716C]">{countBy("roll-on", true)} visible on storefront</div>
         </div>
 
         <div className="rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-4 shadow-sm">
           <div className="text-xs font-medium uppercase tracking-wider text-[#78716C]">Confirmed Sizes</div>
           <div className="mt-2 text-sm font-semibold text-[#171717]">30 ml • 50 ml • 100 ml</div>
-          <div className="mt-1 text-xs text-[#78716C]">Spray bottle sizes</div>
+          <div className="mt-1 text-xs text-[#78716C]">Perfume sprays · Roll-On {DEFAULT_ROLL_ON_SIZE_ML} ml</div>
         </div>
 
         <div className="rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-4 shadow-sm">
           <div className="text-xs font-medium uppercase tracking-wider text-[#78716C]">Standard Pricing</div>
           <div className="mt-2 text-sm font-semibold text-[#8C6D37]">₹400 • ₹630 • ₹1,000</div>
-          <div className="mt-1 text-xs text-[#78716C]">Confirmed standard rates</div>
+          <div className="mt-1 text-xs text-[#78716C]">Perfume spray standard rates</div>
         </div>
       </div>
 
@@ -924,6 +951,46 @@ export function ProductManager({
           </p>
         </div>
       )}
+
+      {/* Migration check (read-only): Roll-On sizes still stored inside a Perfume. */}
+      {perfumesWithRollOnSizes(products).length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" data-rollon-migration>
+          <div className="font-semibold">Roll-On sizes found inside Perfume products</div>
+          <p className="mt-1 text-xs text-amber-800">
+            Roll-Ons are now separate products. These Perfumes still list a Roll-On size, so the Roll-On is shown on the Perfume page:
+          </p>
+          <ul className="mt-2 list-disc pl-5 text-xs">
+            {perfumesWithRollOnSizes(products).map((p) => (
+              <li key={p.id}>
+                {p.name} ({p.id}): {p.sizes.join(", ")}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-amber-800">
+            To fix one: create the Roll-On with &ldquo;New Roll-On&rdquo; (or import it), then edit the Perfume and remove its Roll-On size. Nothing is changed automatically.
+          </p>
+        </div>
+      )}
+
+      {/* Product sections: Perfumes and Roll-On are managed separately */}
+      <div role="tablist" aria-label="Product sections" className="flex flex-wrap gap-2" data-product-sections>
+        {sectionTabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={sectionFilter === t.id}
+            onClick={() => setSectionFilter(t.id)}
+            data-section-tab={t.id}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
+              sectionFilter === t.id ? "border-[#171717] bg-[#171717] text-[#E9D6AB]" : "border-[#E8E4DA] bg-white text-[#57534E] hover:bg-[#F8F5EC]"
+            }`}
+          >
+            {t.label}
+            <span className={`rounded-full px-1.5 text-[10.5px] ${sectionFilter === t.id ? "bg-white/15" : "bg-[#F3EDE2] text-[#8C6D37]"}`}>{t.count}</span>
+          </button>
+        ))}
+      </div>
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col gap-3 rounded-xl border border-[#E8E4DA] bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -964,7 +1031,7 @@ export function ProductManager({
                 <th className="px-4 py-3 font-semibold">Fragrance</th>
                 <th className="px-4 py-3 font-semibold">Category & Keywords</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Variants (30ml / 50ml / 100ml)</th>
+                <th className="px-4 py-3 font-semibold">Sizes & prices</th>
                 <th className="px-4 py-3 font-semibold">Notes</th>
                 <th className="px-4 py-3 font-semibold">Version</th>
                 <th className="px-4 py-3 text-right font-semibold">Actions</th>
@@ -985,7 +1052,7 @@ export function ProductManager({
                     </p>
                     {products.length === 0 && (
                       <button
-                        onClick={openCreateModal}
+                        onClick={() => openCreateModal(PERFUME_TYPE_ID)}
                         className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#171717] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#292D27]"
                       >
                         <Plus className="h-3.5 w-3.5 text-[#C6A76A]" />
@@ -1013,7 +1080,21 @@ export function ProductManager({
                             )}
                           </div>
                           <div>
-                            <div className="font-semibold text-[#171717]">{p.name}</div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-semibold text-[#171717]">{p.name}</span>
+                              <span
+                                className={`rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide ${
+                                  productFormat(p.productTypeId) === "roll-on"
+                                    ? "bg-[#EEF2F7] text-[#3B4A63]"
+                                    : productFormat(p.productTypeId) === "perfume"
+                                      ? "bg-[#F3EDE2] text-[#8C6D37]"
+                                      : "bg-[#F1F1EF] text-[#57534E]"
+                                }`}
+                                data-product-format={productFormat(p.productTypeId)}
+                              >
+                                {productFormat(p.productTypeId) === "other" ? p.productTypeName || "Other" : FORMAT_LABEL[productFormat(p.productTypeId)]}
+                              </span>
+                            </div>
                             <div className="font-mono text-[11px] text-[#78716C]">{p.id}</div>
                             {(p.unverifiedFields?.length ?? 0) > 0 && (
                               <span
@@ -1200,11 +1281,17 @@ export function ProductManager({
                       value={formProductTypeId}
                       onChange={(e) => {
                         const typeId = e.target.value;
+                        const previousTypeId = formProductTypeId;
                         setFormProductTypeId(typeId);
                         const selected = productTypes.find((t) => t.id === typeId);
                         if (selected) {
                           setFormCategory(selected.name);
                           setNotesEnabled(selected.hasNotes);
+                        }
+                        if (modalMode === "CREATE") {
+                          // Keep Perfume and Roll-On separate: a new product takes its type's sizes and web address.
+                          if (productFormat(previousTypeId) !== productFormat(typeId)) setVariantsList(defaultVariantRows(typeId));
+                          if (formName.trim()) setFormId(productIdFor(slugify(formName), typeId));
                         }
                       }}
                       className="mt-1 w-full rounded-lg border border-[#E8E4DA] bg-[#FFFDF8] px-3 py-2 text-xs text-[#171717] focus:border-[#C6A76A] focus:outline-none"
@@ -1571,9 +1658,14 @@ export function ProductManager({
                         <button
                           type="button"
                           onClick={() => addNoteToTier(tier)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#8C6D37] hover:text-[#5E4720]"
+                          disabled={tierNotes.length >= MAX_NOTES_PER_GROUP}
+                          title={tierNotes.length >= MAX_NOTES_PER_GROUP ? `At most ${MAX_NOTES_PER_GROUP} notes per group` : undefined}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#8C6D37] hover:text-[#5E4720] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Plus className="h-3 w-3" /> Add {tier.toUpperCase()} Note
+                          <span className="font-normal text-[#A8A29E]">
+                            ({tierNotes.length}/{MAX_NOTES_PER_GROUP})
+                          </span>
                         </button>
                       </div>
 

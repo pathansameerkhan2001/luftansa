@@ -1,4 +1,6 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
+import { ArrowRight } from "lucide-react";
 import { FlourishIcon } from "./icons";
 import { ProductCard, type PlaceholderKind, type ProductCardData } from "./ProductCard";
 import { ProductCarousel } from "./ProductCarousel";
@@ -11,10 +13,12 @@ interface CollectionPanelProps {
   placeholder?: PlaceholderKind;
   /** Rendered in place of the carousel when the collection has no products yet. */
   emptyState?: ReactNode;
+  /** Link to the full listing of this section (e.g. /perfumes). */
+  viewAll?: { href: string; label: string };
 }
 
 /** Rounded, gold-bordered collection panel with crest, serif heading and product carousel. */
-export function CollectionPanel({ id, title, subtitle, products, placeholder, emptyState }: CollectionPanelProps) {
+export function CollectionPanel({ id, title, subtitle, products, placeholder, emptyState, viewAll }: CollectionPanelProps) {
   const headingId = `${id}-heading`;
 
   return (
@@ -53,6 +57,19 @@ export function CollectionPanel({ id, title, subtitle, products, placeholder, em
           emptyState
         )}
       </div>
+
+      {viewAll && products.length > 0 ? (
+        <div className="mt-6 flex justify-center sm:mt-7">
+          <Link
+            href={viewAll.href}
+            className="group inline-flex items-center gap-2 rounded-full border border-brand-gold/50 bg-white/70 px-5 py-2.5 text-[12px] font-medium tracking-[0.16em] text-brand-black uppercase transition-colors hover:border-brand-gold hover:bg-brand-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold"
+            data-view-all={id}
+          >
+            {viewAll.label}
+            <ArrowRight aria-hidden="true" className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" strokeWidth={1.75} />
+          </Link>
+        </div>
+      ) : null}
     </section>
   );
 }

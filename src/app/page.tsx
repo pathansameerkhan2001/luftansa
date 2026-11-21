@@ -1,4 +1,4 @@
-import { BenefitsStrip } from "@/components/benefits/BenefitsStrip";
+import { HomeBenefits } from "@/components/benefits/HomeBenefits";
 import { BestSellers } from "@/components/bestsellers/BestSellers";
 import { HomeCollections } from "@/components/collection/HomeCollections";
 import { HeroSection } from "@/components/hero/HeroSection";
@@ -18,7 +18,7 @@ export default function Home() {
   return (
     <main>
       <HeroSection />
-      <BenefitsStrip />
+      <HomeBenefits />
       <HomeCollections />
       <ExploreByNotes />
       <BestSellers />

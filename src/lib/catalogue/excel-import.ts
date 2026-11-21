@@ -6,10 +6,12 @@
  *   raw rows ──validateRows──▶ valid rows + row issues (field errors, duplicates, conflicts)
  *   valid rows + existing products ──planImport──▶ plan (what would be created/updated) + totals
  *
- * Organisation: one product per Product Name (case-insensitive); each row is a
- * variant identified by type + size (e.g. Spray 30 ml, Roll-On 8 ml). The
- * product's type is the type most of its rows use; variants of another type
- * are labelled with it ("8 ml Roll-On") so the storefront size selector stays clear.
+ * Organisation: one product per Product Name AND Type (case-insensitive). Spray
+ * rows become a Perfume product with its spray sizes; Roll-On rows become a
+ * separate Roll-On product with its own web address ("black-velvet-roll-on"),
+ * never a size of the Perfume (src/lib/catalogue/product-format.ts). Matching
+ * existing products always requires the same type, so a Perfume and a Roll-On
+ * of the same fragrance can never overwrite each other.
  *
  * Nothing is written here. The server applies a plan (./excel-import-apply.ts)
  * only after the admin confirmed it and only if the plan is still identical
@@ -17,6 +19,8 @@
  */
 import { z } from "zod";
 import type { FragranceNotes, ProductTypeItem, ProductTypeUnit, ProductVariantItem, ProductItem } from "@/lib/db/schemas";
+import { MAX_NOTES_PER_GROUP } from "@/lib/db/schemas";
+import { categoryForType, FORMAT_LABEL, PERFUME_TYPE_ID, productFormat, productIdFor } from "./product-format";
 
 /* ------------------------------------------------------------------ fields --- */
 
@@ -216,7 +220,7 @@ export function parseNotes(v: unknown): { notes: FragranceNotes | null; error?: 
       const id = slugify(name) || `note-${notes[group].length + 1}`;
       if (!notes[group].some((n) => n.id === id)) notes[group].push({ id, name });
     }
-    if (notes[group].length > 10) return { notes: null, error: "At most 10 notes per group (Top, Middle, Base)" };
+    if (notes[group].length > MAX_NOTES_PER_GROUP) return { notes: null, error: `At most ${MAX_NOTES_PER_GROUP} notes per group (Top, Middle, Base)` };
   }
   return { notes };
 }
@@ -262,6 +266,8 @@ export interface ValidationResult {
 }
 
 const variantKeyOf = (r: Pick<ValidRow, "productKey" | "productTypeId" | "capacity" | "unit">) => `${r.productKey}|${r.productTypeId}|${r.capacity}|${r.unit}`;
+/** One product per name + type: a Perfume and a Roll-On of the same fragrance are separate products. */
+const groupKeyOf = (r: Pick<ValidRow, "productKey" | "productTypeId">) => `${r.productKey}|${r.productTypeId}`;
 const sameContent = (a: ValidRow, b: ValidRow) =>
   a.priceInr === b.priceInr && a.stockQuantity === b.stockQuantity && a.sku === b.sku && a.category === b.category && notesSignature(a.notes) === notesSignature(b.notes);
 
@@ -286,10 +292,10 @@ export function validateRows(rows: readonly RawImportRow[], ctx: ValidationConte
     if (!rawName) err(row.rowNumber, "Product name is missing", "name");
     else if (rawName.length > 120) err(row.rowNumber, "Product name is longer than 120 characters", "name");
     const name = ctx.titleCaseNames ? toTitleCase(rawName) : rawName;
-    if (rawName) productKeyByRow.set(row.rowNumber, productKeyOf(rawName));
-
     const typeText = text(v.type);
     const productTypeId = typeText ? ctx.typeMap[typeKey(typeText)] : undefined;
+    // Product (name + type) this row belongs to, used to hold back a product with a problem row.
+    if (rawName) productKeyByRow.set(row.rowNumber, `${productKeyOf(rawName)}|${productTypeId ?? typeKey(typeText)}`);
     if (!typeText) err(row.rowNumber, "Type is missing", "type");
     else if (!productTypeId || !typeNames.has(productTypeId)) err(row.rowNumber, `Type "${typeText}" is not matched to a product type`, "type");
 
@@ -319,7 +325,8 @@ export function validateRows(rows: readonly RawImportRow[], ctx: ValidationConte
     if (issues.length === before) {
       parsed.push({
         rowNumber: row.rowNumber, productKey: productKeyOf(rawName), name, productTypeId: productTypeId!, productTypeName: typeNames.get(productTypeId!)!,
-        capacity: size!.capacity, unit: size!.unit, priceInr: price!, category, stockQuantity: stock!, sku: sku!, notes: notes.notes,
+        // A Roll-On listed under "Perfumes" is categorised "Roll-On"; Perfumes keep their category.
+        capacity: size!.capacity, unit: size!.unit, priceInr: price!, category: categoryForType(productTypeId, category), stockQuantity: stock!, sku: sku!, notes: notes.notes,
       });
     }
   }
@@ -354,7 +361,7 @@ export function validateRows(rows: readonly RawImportRow[], ctx: ValidationConte
 
   // Product-level consistency.
   const byProduct = new Map<string, ValidRow[]>();
-  for (const r of parsed.filter((r) => !dropped.has(r.rowNumber))) byProduct.set(r.productKey, [...(byProduct.get(r.productKey) ?? []), r]);
+  for (const r of parsed.filter((r) => !dropped.has(r.rowNumber))) byProduct.set(groupKeyOf(r), [...(byProduct.get(groupKeyOf(r)) ?? []), r]);
   const slugOwner = new Map<string, string>();
   for (const [key, group] of byProduct) {
     const rowsText = group.map((r) => r.rowNumber).join(", ");
@@ -362,7 +369,8 @@ export function validateRows(rows: readonly RawImportRow[], ctx: ValidationConte
     const withNotes = group.filter((r) => r.notes);
     if (new Set(withNotes.map((r) => notesSignature(r.notes))).size > 1) for (const r of withNotes) err(r.rowNumber, `Notes differ between rows of this product`, "notes");
     if (group.length > MAX_VARIANTS_PER_PRODUCT) for (const r of group) err(r.rowNumber, `A product can have at most ${MAX_VARIANTS_PER_PRODUCT} variants`);
-    const slug = slugify(group[0].name);
+    const base = slugify(group[0].name);
+    const slug = base ? productIdFor(base, group[0].productTypeId) : "";
     if (!slug) for (const r of group) err(r.rowNumber, "Product name needs at least one letter or number", "name");
     else if (slugOwner.has(slug) && slugOwner.get(slug) !== key) for (const r of group) err(r.rowNumber, `Product name is too similar to another product in the file (same web address "${slug}")`, "name");
     else slugOwner.set(slug, key);
@@ -382,7 +390,7 @@ function finalize(parsed: ValidRow[], dropped: Set<number>, issues: RowIssue[], 
   const valid: ValidRow[] = [];
   for (const r of parsed) {
     if (dropped.has(r.rowNumber) || errorRows.has(r.rowNumber)) continue;
-    const blockedBy = blockedProducts.get(r.productKey);
+    const blockedBy = blockedProducts.get(productKeyByRow.get(r.rowNumber) ?? groupKeyOf(r));
     if (blockedBy !== undefined) {
       issues.push({ rowNumber: r.rowNumber, kind: "error", message: `Held back: row ${blockedBy} of the same product has an error` });
       continue;
@@ -474,46 +482,58 @@ const fmtNotes = (n: FragranceNotes | null | undefined) =>
     ? `Top: ${n.top.map((x) => x.name).join(", ") || "-"} · Middle: ${n.heart.map((x) => x.name).join(", ") || "-"} · Base: ${n.base.map((x) => x.name).join(", ") || "-"}`
     : "none";
 
-function mostCommonType(rows: readonly ValidRow[]): { id: string; name: string } {
-  const counts = new Map<string, { n: number; first: number; name: string }>();
-  rows.forEach((r, i) => {
-    const c = counts.get(r.productTypeId) ?? { n: 0, first: i, name: r.productTypeName };
-    c.n++;
-    counts.set(r.productTypeId, c);
-  });
-  const [id, c] = [...counts.entries()].sort((a, b) => b[1].n - a[1].n || a[1].first - b[1].first)[0];
-  return { id, name: c.name };
-}
-
-const labelFor = (r: Pick<ValidRow, "capacity" | "unit" | "productTypeId" | "productTypeName">, primaryTypeId: string) =>
-  r.productTypeId === primaryTypeId ? `${r.capacity} ${r.unit}` : `${r.capacity} ${r.unit} ${r.productTypeName}`;
+const labelOf = (r: Pick<ValidRow, "capacity" | "unit">) => `${r.capacity} ${r.unit}`;
+const typeOfExisting = (e: ExistingProduct) => e.product.productTypeId ?? PERFUME_TYPE_ID;
+const formatName = (typeId: string, typeName?: string) => (productFormat(typeId) === "other" ? typeName ?? typeId : FORMAT_LABEL[productFormat(typeId)]);
 
 /**
  * Matches validated rows against existing products and decides, per product,
  * what would be created or changed. Pure: never writes.
  *
- * Product matching (in order): any row SKU already used by a product's variant;
- * else the same web address (slug); else the same name. Contradictions are errors.
- * Variant matching inside an existing product: same SKU; else same size for the
- * product's own type on a variant without a SKU. Existing SKUs are never replaced.
+ * Product matching (in order), always within the same product type: any row SKU
+ * already used by a product's variant; else the same web address; else the same
+ * name. A SKU or web address that belongs to a product of another type (e.g. a
+ * Roll-On SKU stored as a size of the Perfume) is an error, never an overwrite.
+ * Variant matching inside an existing product: same SKU; else the same size on a
+ * variant without a SKU. Existing SKUs are never replaced.
  */
 export function planImport(validation: ValidationResult, existing: readonly ExistingProduct[], options: ImportOptions): ImportPlan {
   const issues = [...validation.issues];
   const err = (rowNumber: number, message: string, field?: ImportField) => issues.push({ rowNumber, field, message, kind: "error" });
 
   const bySlug = new Map(existing.map((e) => [e.product.id, e]));
-  const byName = new Map(existing.map((e) => [productKeyOf(normalizeProductName(e.product.name)), e]));
+  const byName = new Map(existing.map((e) => [`${productKeyOf(normalizeProductName(e.product.name))}|${typeOfExisting(e)}`, e]));
   const skuOwner = new Map<string, { product: ExistingProduct; variant: ExistingProduct["variants"][number] }>();
   for (const e of existing) for (const v of e.variants) if (v.sku) skuOwner.set(v.sku.toUpperCase(), { product: e, variant: v });
 
   const groups = new Map<string, ValidRow[]>();
-  for (const r of validation.valid) groups.set(r.productKey, [...(groups.get(r.productKey) ?? []), r]);
+  for (const r of validation.valid) groups.set(groupKeyOf(r), [...(groups.get(groupKeyOf(r)) ?? []), r]);
 
   const products: PlannedProduct[] = [];
   for (const rows of groups.values()) {
     const rowNums = rows.map((r) => r.rowNumber);
     const fail = (message: string, field?: ImportField) => rows.forEach((r) => err(r.rowNumber, message, field));
-    const slug = slugify(rows[0].name);
+    const typeId = rows[0].productTypeId;
+    const slug = productIdFor(slugify(rows[0].name), typeId);
+
+    // A SKU of another type's product (e.g. a Roll-On SKU stored as a size of the Perfume) is never taken over.
+    const crossType = rows.filter((r) => {
+      const owner = skuOwner.get(r.sku);
+      return owner && typeOfExisting(owner.product) !== typeId;
+    });
+    if (crossType.length) {
+      for (const r of crossType) {
+        const owner = skuOwner.get(r.sku)!;
+        err(r.rowNumber, `SKU ${r.sku} belongs to the ${formatName(typeOfExisting(owner.product), owner.product.product.productTypeName)} product "${owner.product.product.name}", but this row is a ${formatName(typeId, r.productTypeName)}. Perfumes and Roll-Ons are separate products: move or change this SKU in Products first.`, "sku");
+      }
+      for (const r of rows) if (!crossType.includes(r)) err(r.rowNumber, `Held back: another row of this ${formatName(typeId, r.productTypeName)} has a SKU conflict`);
+      continue;
+    }
+    const slugOwner = bySlug.get(slug);
+    if (slugOwner && typeOfExisting(slugOwner) !== typeId) {
+      fail(`The web address "${slug}" is already used by the ${formatName(typeOfExisting(slugOwner), slugOwner.product.productTypeName)} product "${slugOwner.product.name}"`, "name");
+      continue;
+    }
 
     const skuProducts = new Set(rows.map((r) => skuOwner.get(r.sku)?.product).filter((p): p is ExistingProduct => Boolean(p)));
     if (skuProducts.size > 1) {
@@ -521,7 +541,7 @@ export function planImport(validation: ValidationResult, existing: readonly Exis
       continue;
     }
     const bySkuMatch = [...skuProducts][0];
-    const byIdentity = bySlug.get(slug) ?? byName.get(rows[0].productKey);
+    const byIdentity = slugOwner ?? byName.get(groupKeyOf(rows[0]));
     if (bySkuMatch && byIdentity && bySkuMatch !== byIdentity) {
       fail(`SKU belongs to "${bySkuMatch.product.name}" but the name matches "${byIdentity.product.name}"`, "sku");
       continue;
@@ -530,14 +550,13 @@ export function planImport(validation: ValidationResult, existing: readonly Exis
     const notes = rows.find((r) => r.notes)?.notes ?? null;
 
     if (!match) {
-      const primary = mostCommonType(rows);
-      const ordered = [...rows].sort((a, b) => Number(b.productTypeId === primary.id) - Number(a.productTypeId === primary.id) || a.productTypeName.localeCompare(b.productTypeName) || a.capacity - b.capacity);
+      const ordered = [...rows].sort((a, b) => a.capacity - b.capacity);
       products.push({
-        action: "create", productId: slug, name: rows[0].name, productTypeId: primary.id, productTypeName: primary.name, category: rows[0].category, notes,
-        sizes: [...new Set(ordered.filter((r) => r.productTypeId === primary.id).map((r) => r.capacity))].sort((a, b) => a - b),
+        action: "create", productId: slug, name: rows[0].name, productTypeId: typeId, productTypeName: rows[0].productTypeName, category: rows[0].category, notes,
+        sizes: [...new Set(ordered.map((r) => r.capacity))],
         status: options.activateNewProducts ? "ACTIVE" : "INACTIVE", changes: [], rows: rowNums,
         variants: ordered.map((r, i) => ({
-          action: "create", variantId: variantIdFromSku(r.sku), rowNumber: r.rowNumber, capacity: r.capacity, unit: r.unit, label: labelFor(r, primary.id),
+          action: "create", variantId: variantIdFromSku(r.sku), rowNumber: r.rowNumber, capacity: r.capacity, unit: r.unit, label: labelOf(r),
           priceInr: r.priceInr, stockQuantity: r.stockQuantity, sku: r.sku, sortOrder: i, changes: [],
         })),
       });
@@ -546,7 +565,7 @@ export function planImport(validation: ValidationResult, existing: readonly Exis
 
     // Existing product.
     const p = match.product;
-    const primaryTypeId = p.productTypeId ?? "perfume-spray";
+    const primaryTypeId = typeOfExisting(match);
     const live = match.variants.filter((v) => v.status !== "ARCHIVED");
     const claimed = new Map<string, number>();
     const planned: PlannedVariant[] = [];
@@ -564,7 +583,7 @@ export function planImport(validation: ValidationResult, existing: readonly Exis
           continue;
         }
         target = owner.variant;
-      } else if (r.productTypeId === primaryTypeId) {
+      } else {
         target = live.find((v) => (v.capacity ?? v.sizeMl) === r.capacity && (v.unit ?? "ml") === r.unit);
         if (target?.sku && target.sku.toUpperCase() !== r.sku) {
           err(r.rowNumber, `"${p.name}" ${r.capacity} ${r.unit} already has SKU ${target.sku}; the file has ${r.sku}. SKUs are never replaced by an import.`, "sku");
@@ -594,9 +613,9 @@ export function planImport(validation: ValidationResult, existing: readonly Exis
         while (takenIds.has(id)) id = `${id.slice(0, 60)}-${takenIds.size}`;
         takenIds.add(id);
         planned.push({
-          action: "create", variantId: id, rowNumber: r.rowNumber, capacity: r.capacity, unit: r.unit, label: labelFor(r, primaryTypeId),
+          action: "create", variantId: id, rowNumber: r.rowNumber, capacity: r.capacity, unit: r.unit, label: labelOf(r),
           priceInr: r.priceInr, stockQuantity: r.stockQuantity, sku: r.sku, sortOrder: nextSort++,
-          changes: [{ field: "Variant", from: "-", to: `new ${labelFor(r, primaryTypeId)}` }],
+          changes: [{ field: "Variant", from: "-", to: `new ${labelOf(r)}` }],
         });
       }
     }
@@ -610,7 +629,7 @@ export function planImport(validation: ValidationResult, existing: readonly Exis
     const changes: FieldChange[] = [];
     if (p.category.toLowerCase() !== rows[0].category.toLowerCase()) changes.push({ field: "Category", from: p.category, to: rows[0].category });
     if (notes && notesSignature(notes) !== notesSignature(p.notes ?? null)) changes.push({ field: "Notes", from: fmtNotes(p.notes), to: fmtNotes(notes) });
-    const newPrimarySizes = planned.filter((v) => v.action === "create" && rows.find((r) => r.rowNumber === v.rowNumber)!.productTypeId === primaryTypeId).map((v) => v.capacity);
+    const newPrimarySizes = planned.filter((v) => v.action === "create").map((v) => v.capacity);
     const existingSizes = (p.sizes ?? []).map(Number).filter((n) => Number.isFinite(n));
     const sizes = [...new Set([...existingSizes, ...newPrimarySizes])].sort((a, b) => a - b);
 

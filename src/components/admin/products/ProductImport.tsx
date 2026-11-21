@@ -15,6 +15,7 @@ import {
   type CellValue, type ColumnMapping, type ImportField, type ImportOptions, type ImportPlan, type PlannedProduct,
 } from "@/lib/catalogue/excel-import";
 import type { ImportResult } from "@/lib/catalogue/excel-import-apply";
+import { FORMAT_LABEL, productFormat } from "@/lib/catalogue/product-format";
 import type { SheetData } from "@/lib/catalogue/spreadsheet";
 import { Card } from "@/components/admin/cms/FormFields";
 import { ADMIN_FOCUS, BTN_PRIMARY, BTN_SECONDARY, ConfirmDialog, FeedbackBanner, FilterTabs, INPUT, PageIntro, Spinner, StatusBadge, useFeedback } from "@/components/admin/cms/ui";
@@ -87,7 +88,14 @@ function ProductRow({ p }: { p: PlannedProduct }) {
     <li className="border-b border-[#efe6d4] last:border-0" data-plan-product={p.productId} data-plan-action={p.action}>
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={`flex w-full items-center gap-3 px-1 py-3 text-left ${ADMIN_FOCUS}`}>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-semibold text-brand-black">{p.name}</p>
+          <p className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-[14px] font-semibold text-brand-black">{p.name}</span>
+            {productFormat(p.productTypeId) !== "other" ? (
+              <span className="shrink-0 rounded border border-[#d9c79f] bg-brand-cream px-1.5 text-[10.5px] font-semibold tracking-wide text-brand-text/75 uppercase" data-plan-format={productFormat(p.productTypeId)}>
+                {FORMAT_LABEL[productFormat(p.productTypeId)]}
+              </span>
+            ) : null}
+          </p>
           <p className="text-[12px] text-brand-text/60">
             {p.productTypeName} · {p.category} · {plural(p.variants.length, "variant")}
             {p.action === "update" || p.action === "skip" ? ` · ${plural(changedVariants + p.changes.length, "change")}` : ""}
@@ -334,7 +342,7 @@ export function ProductImport() {
 
       {/* ---------------------------------------------------------- 1. Upload */}
       {step === "upload" ? (
-        <Card icon={<FileSpreadsheet className="size-4.5" strokeWidth={1.5} />} title="Upload your Excel file" description="One row per size, for example: Product Name, Type, Size (ml), Price, Category, Stock, SKU, Notes.">
+        <Card icon={<FileSpreadsheet className="size-4.5" strokeWidth={1.5} />} title="Upload your Excel file" description="One row per size, for example: Product Name, Type, Size (ml), Price, Category, Stock, SKU, Notes. Spray rows become Perfumes; Roll-On rows become separate Roll-On products.">
           <div
             onDragOver={(e: DragEvent) => {
               e.preventDefault();
@@ -481,7 +489,17 @@ export function ProductImport() {
       {step === "review" && plan ? (
         <>
           <section aria-label="Import totals" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <Tile label="New products" value={plan.totals.newProducts} tone="success" />
+            <Tile
+              label="New products"
+              value={plan.totals.newProducts}
+              tone="success"
+              hint={(() => {
+                const created = plan.products.filter((p) => p.action === "create");
+                const perfumes = created.filter((p) => productFormat(p.productTypeId) === "perfume").length;
+                const rollOns = created.filter((p) => productFormat(p.productTypeId) === "roll-on").length;
+                return created.length ? `${perfumes} perfume${perfumes === 1 ? "" : "s"} · ${rollOns} roll-on${rollOns === 1 ? "" : "s"}` : undefined;
+              })()}
+            />
             <Tile label="New variants" value={plan.totals.newVariants} tone="success" />
             <Tile label="Existing records to update" value={plan.totals.existingRecordsToUpdate} tone="warning" hint={plan.totals.existingProductsAffected ? plural(plan.totals.existingProductsAffected, "product") : undefined} />
             <Tile label="Duplicates skipped" value={plan.totals.duplicates} />

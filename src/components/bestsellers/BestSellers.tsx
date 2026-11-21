@@ -39,7 +39,7 @@ async function buildItems(): Promise<BestSellerItem[]> {
 
     return {
       slug: product.slug,
-      name: product.name,
+      name: product.displayName,
       href: productHref(product.slug),
       options: product.options,
       concentration: product.concentration,

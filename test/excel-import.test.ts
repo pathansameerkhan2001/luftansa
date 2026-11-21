@@ -85,7 +85,9 @@ console.log("2. Field parsing...");
   assert.deepEqual(n.notes?.heart.map((x) => x.name), ["Iris", "Tobacco"], "Middle → heart notes");
   assert.equal(parseNotes("").notes, null);
   assert.ok(parseNotes("Bergamot and amber").error);
-  assert.ok(parseNotes(`Base: ${Array.from({ length: 11 }, (_, i) => `Note${i}`).join("; ")}`).error, "more than 10 notes in a group");
+  assert.equal(parseNotes(`Base: ${Array.from({ length: 11 }, (_, i) => `Note${i}`).join("; ")}`).notes?.base.length, 11, "11 notes in a group (Afghan Tiger)");
+  assert.equal(parseNotes(`Base: ${Array.from({ length: 12 }, (_, i) => `Note${i}`).join("; ")}`).notes?.base.length, 12, "12 notes in a group");
+  assert.match(parseNotes(`Base: ${Array.from({ length: 13 }, (_, i) => `Note${i}`).join("; ")}`).error ?? "", /At most 12 notes per group/, "more than 12 notes in a group");
   console.log("   ✓ sizes, rupees, stock, SKU, names, slugs, types, notes");
 }
 
@@ -127,7 +129,8 @@ console.log("4. Duplicates and conflicts...");
   changed[3] = 499;
   const c = validateRows(rowsOf(sheet(base, [changed])), ctx);
   assert.match(errorsFor(c.issues, 2), /Rows 2, 6 are the same product, type and size with different values/);
-  assert.equal(c.valid.length, 0, "conflicting repeat holds back the whole product");
+  assert.equal(c.valid.length, 1, "the Perfume is held back; its Roll-On is a separate product and stays valid");
+  assert.equal(c.valid[0].productTypeId, "roll-on");
   assert.match(errorsFor(c.issues, 3), /Held back: row 2/);
 
   const other = fragrance("PURPLE SPORT", 2);
@@ -137,8 +140,11 @@ console.log("4. Duplicates and conflicts...");
   assert.match(errorsFor(s.issues, 6), /SKU LFT-001-SP-030/);
 
   const cat = fragrance("STONEWOOD", 1);
-  cat[3][4] = "Attars";
-  assert.match(errorsFor(validateRows(rowsOf(sheet(cat)), ctx).issues, 2), /Category differs between rows/);
+  cat[2][4] = "Attars"; // Spray 100 ml differs from the other Spray rows
+  assert.match(errorsFor(validateRows(rowsOf(sheet(cat)), ctx).issues, 2), /Category differs between rows 2, 3, 4/);
+  const rollOnCategory = fragrance("STONEWOOD", 1);
+  rollOnCategory[3][4] = "Roll-Ons";
+  assert.equal(validateRows(rowsOf(sheet(rollOnCategory)), ctx).issues.length, 0, "a Roll-On may have its own category (separate product)");
 
   const notes = fragrance("STONEWOOD", 1);
   notes[2][7] = "Top: Rose";
@@ -150,42 +156,58 @@ console.log("4. Duplicates and conflicts...");
   const clash = validateRows(rowsOf(sheet(fragrance("Oud-Forest", 3), fragrance("Oud Forest", 4))), { ...ctx, titleCaseNames: false });
   assert.match(errorsFor(clash.issues, 6), /same web address "oud-forest"/);
 
-  const tooMany = fragrance("AFGHAN TIGER", 5, { notes: `Base: ${Array.from({ length: 11 }, (_, i) => `N${i}`).join("; ")}` });
+  const both = validateRows(rowsOf(sheet(fragrance("BLACK VELVET", 4))), ctx);
+  assert.equal(both.issues.length, 0, "the same name as Spray and Roll-On is not a clash: two products");
+
+  const afghan = validateRows(rowsOf(sheet(fragrance("AFGHAN TIGER", 5, { notes: `Base: ${Array.from({ length: 11 }, (_, i) => `N${i}`).join("; ")}` }))), ctx);
+  assert.deepEqual([afghan.valid.length, afghan.issues.length], [4, 0], "11 Base notes (Afghan Tiger) are accepted");
+  const tooMany = fragrance("TOO MANY", 6, { notes: `Base: ${Array.from({ length: 13 }, (_, i) => `N${i}`).join("; ")}` });
   const t = validateRows(rowsOf(sheet(tooMany)), ctx);
   assert.equal(t.valid.length, 0);
   assert.equal(new Set(t.issues.map((i) => i.rowNumber)).size, 4, "all four rows of the product reported");
   console.log("   ✓ duplicates skipped; conflicting rows, shared SKUs, category/notes clashes and similar names rejected");
 }
 
-console.log("5. Parent products and variants...");
+console.log("5. Perfumes and Roll-Ons become separate products...");
 {
   const v = validateRows(rowsOf(sheet(fragrance("BLACK VELVET", 4), fragrance("STONEWOOD", 1, { notes: null }))), ctx);
   const plan = planImport(v, [], OFF);
-  assert.equal(plan.products.length, 2, "one product per name, not one per row");
+  assert.deepEqual(plan.products.map((p) => [p.productId, p.productTypeId, p.variants.length]), [
+    ["black-velvet", "perfume-spray", 3],
+    ["black-velvet-roll-on", "roll-on", 1],
+    ["stonewood", "perfume-spray", 3],
+    ["stonewood-roll-on", "roll-on", 1],
+  ], "one product per name and type; never one per row");
   const bv = plan.products.find((p) => p.productId === "black-velvet")!;
   assert.equal(bv.action, "create");
   assert.equal(bv.name, "Black Velvet");
-  assert.equal(bv.productTypeId, "perfume-spray", "type used by most rows");
+  assert.equal(bv.productTypeName, "Perfume Spray");
   assert.equal(bv.status, "INACTIVE", "new products are Hidden unless chosen otherwise");
   assert.deepEqual(bv.sizes, [30, 50, 100]);
   assert.deepEqual(bv.variants.map((x) => [x.label, x.priceInr, x.stockQuantity, x.sku, x.sortOrder]), [
     ["30 ml", 449, 100, "LFT-004-SP-030", 0],
     ["50 ml", 749, 100, "LFT-004-SP-050", 1],
     ["100 ml", 1299, 100, "LFT-004-SP-100", 2],
-    ["8 ml Roll-On", 229, 100, "LFT-004-RO-008", 3],
-  ]);
+  ], "Perfume: spray sizes only");
+  assert.ok(!bv.variants.some((x) => x.sku.includes("-RO-")), "a Roll-On is never a size of the Perfume");
+  const ro = plan.products.find((p) => p.productId === "black-velvet-roll-on")!;
+  assert.equal(ro.name, "Black Velvet", "same fragrance name; the storefront shows it as 'Black Velvet Roll-On'");
+  assert.equal(ro.productTypeName, "Roll-On");
+  assert.equal(ro.category, "Roll-On", "a Roll-On listed under 'Perfumes' is categorised Roll-On");
+  assert.equal(bv.category, "Perfumes", "Perfumes keep their category");
+  assert.deepEqual(ro.sizes, [8]);
+  assert.deepEqual(ro.variants.map((x) => [x.label, x.priceInr, x.stockQuantity, x.sku, x.variantId]), [["8 ml", 229, 100, "LFT-004-RO-008", "v_lft-004-ro-008"]]);
+  assert.deepEqual(ro.notes?.base.map((n) => n.name), ["Vanilla", "Musk"], "notes carried by the Roll-On too");
   assert.equal(bv.variants[0].variantId, "v_lft-004-sp-030", "stable variant id from the SKU");
-  assert.deepEqual(bv.notes?.base.map((n) => n.name), ["Vanilla", "Musk"]);
   assert.equal(plan.products.find((p) => p.productId === "stonewood")!.notes, null);
   assert.deepEqual(
     { newProducts: plan.totals.newProducts, newVariants: plan.totals.newVariants, rows: plan.totals.rows, invalid: plan.totals.invalidRows },
-    { newProducts: 2, newVariants: 8, rows: 8, invalid: 0 },
+    { newProducts: 4, newVariants: 8, rows: 8, invalid: 0 },
   );
   assert.equal(planImport(v, [], { updateExisting: false, activateNewProducts: true }).products[0].status, "ACTIVE");
   const rollOnOnly = planImport(validateRows(rowsOf(sheet([["Mini", "Roll-On", "8 ml", 229, "Perfumes", 5, "MINI-RO", null]])), ctx), [], OFF);
-  assert.equal(rollOnOnly.products[0].productTypeId, "roll-on");
-  assert.equal(rollOnOnly.products[0].variants[0].label, "8 ml", "no type suffix for the product's own type");
-  console.log("   ✓ grouped by name; variants by type and size; labels, order, sizes, notes");
+  assert.deepEqual([rollOnOnly.products[0].productId, rollOnOnly.products[0].productTypeId, rollOnOnly.products[0].variants[0].label], ["mini-roll-on", "roll-on", "8 ml"]);
+  console.log("   ✓ Spray rows → Perfume (30/50/100 ml); Roll-On rows → separate Roll-On product (8 ml); own web address and SKU");
 }
 
 /** An existing product shaped like today's local catalogue (spray 30/50/100, no SKUs, standard prices). */
@@ -196,24 +218,52 @@ function existingProduct(id: string, name: string, extra: Partial<ExistingProduc
   };
 }
 
-console.log("6. Matching existing products safely...");
+/** An existing Roll-On product (separate record), optionally with SKU. */
+function existingRollOn(id: string, name: string, sku?: string): ExistingProduct {
+  return {
+    product: { id, name, version: 2, productTypeId: "roll-on", productTypeName: "Roll-On", category: "Perfumes", notes: { top: [], heart: [], base: [] }, sizes: [8], status: "ACTIVE" },
+    variants: [{ id: "8ml", sk: "VARIANT#8ml", capacity: 8, unit: "ml", label: "8 ml", priceInr: 199, status: "ACTIVE", sortOrder: 0, version: 1, ...(sku ? { sku } : {}) }],
+  };
+}
+
+console.log("6. Matching existing products safely (always within the same type)...");
 {
   const file = validateRows(rowsOf(sheet(fragrance("BLACK VELVET", 4))), ctx);
   const existing = [existingProduct("black-velvet", "Black Velvet")];
   const skip = planImport(file, existing, OFF);
-  assert.equal(skip.products[0].action, "skip", "existing product not changed unless updates are on");
+  assert.deepEqual(skip.products.map((p) => [p.productId, p.action]), [["black-velvet", "skip"], ["black-velvet-roll-on", "create"]], "existing Perfume not changed; Roll-On is a new separate product");
   assert.equal(skip.totals.existingSkipped, 1);
-  assert.equal(skip.totals.newProducts + skip.totals.newVariants + skip.totals.existingRecordsToUpdate, 0, "nothing would be written");
+  assert.deepEqual([skip.totals.newProducts, skip.totals.newVariants, skip.totals.existingRecordsToUpdate], [1, 1, 0]);
 
   const upd = planImport(file, existing, { ...OFF, updateExisting: true });
   const p = upd.products[0];
   assert.equal(p.action, "update");
   assert.deepEqual(p.changes.map((c) => c.field), ["Category", "Notes"]);
-  assert.deepEqual(p.variants.map((v) => [v.variantId, v.action]), [["30ml", "update"], ["50ml", "update"], ["100ml", "update"], [p.variants[3].variantId, "create"]]);
+  assert.deepEqual(p.variants.map((v) => [v.variantId, v.action]), [["30ml", "update"], ["50ml", "update"], ["100ml", "update"]], "no Roll-On added to the Perfume");
   assert.deepEqual(p.variants[0].changes, [{ field: "Price", from: "400", to: "449" }, { field: "Stock", from: "not set", to: "100" }, { field: "SKU", from: "not set", to: "LFT-004-SP-030" }]);
-  assert.equal(p.variants[3].label, "8 ml Roll-On");
-  assert.deepEqual(p.sizes, [30, 50, 100], "a Roll-On does not change the spray sizes");
-  assert.deepEqual({ ...upd.totals, rows: undefined }, { ...upd.totals, rows: undefined, newProducts: 0, newVariants: 1, existingRecordsToUpdate: 4, existingProductsAffected: 1 });
+  assert.deepEqual(p.sizes, [30, 50, 100]);
+  assert.deepEqual([upd.totals.newProducts, upd.totals.newVariants, upd.totals.existingRecordsToUpdate, upd.totals.existingProductsAffected], [1, 1, 4, 1]);
+
+  // An existing Roll-On is matched by SKU (or web address) and updated on its own; the Perfume is untouched by it.
+  const withRollOn = planImport(file, [existingProduct("black-velvet", "Black Velvet"), existingRollOn("black-velvet-roll-on", "Black Velvet", "LFT-004-RO-008")], { ...OFF, updateExisting: true });
+  const ro = withRollOn.products.find((x) => x.productTypeId === "roll-on")!;
+  assert.deepEqual([ro.productId, ro.action, ro.variants[0].variantId, ro.variants[0].changes.map((c) => c.field).join("+")], ["black-velvet-roll-on", "update", "8ml", "Price+Stock"]);
+
+  // Name matching never crosses types: a Roll-On called "Black Velvet" is not the Perfume.
+  const rollOnByName = planImport(file, [existingRollOn("bv-mini", "Black Velvet")], { ...OFF, updateExisting: true });
+  assert.deepEqual(rollOnByName.products.map((x) => [x.productId, x.action]), [["black-velvet", "create"], ["bv-mini", "update"]]);
+
+  // A Roll-On SKU stored as a size of the Perfume (old structure) is reported, never overwritten.
+  const legacy = existingProduct("black-velvet", "Black Velvet");
+  legacy.variants.push({ id: "v_lft-004-ro-008", sk: "VARIANT#v_lft-004-ro-008", capacity: 8, unit: "ml", label: "8 ml Roll-On", priceInr: 229, status: "ACTIVE", sortOrder: 3, version: 1, sku: "LFT-004-RO-008" });
+  const legacyPlan = planImport(file, [legacy], { ...OFF, updateExisting: true });
+  assert.match(errorsFor(legacyPlan.issues, 5), /SKU LFT-004-RO-008 belongs to the Perfume product "Black Velvet", but this row is a Roll-On/);
+  assert.ok(!legacyPlan.products.some((x) => x.productTypeId === "roll-on"), "no Roll-On planned while its SKU sits inside the Perfume");
+  assert.equal(legacyPlan.products[0].productId, "black-velvet", "the Perfume rows are still handled normally");
+
+  // A web address used by a product of another type is reported.
+  const taken = existingProduct("black-velvet-roll-on", "Something Else");
+  assert.match(errorsFor(planImport(file, [taken], OFF).issues, 5), /web address "black-velvet-roll-on" is already used by the Perfume product "Something Else"/);
 
   // Matched by name when the web address differs.
   const byName = planImport(file, [existingProduct("bv-classic", "Black Velvet")], { ...OFF, updateExisting: true });
@@ -225,9 +275,9 @@ console.log("6. Matching existing products safely...");
   assert.equal(bySku.products[0].productId, "velvet-noir");
   assert.equal(bySku.products[0].name, "Velvet Noir");
 
-  // SKU on one product, name on another → conflict, nothing planned.
+  // SKU on one product, name on another → conflict; only the Roll-On (unaffected) is planned.
   const contradiction = planImport(file, [withSkus, existingProduct("black-velvet", "Black Velvet")], { ...OFF, updateExisting: true });
-  assert.equal(contradiction.products.length, 0);
+  assert.deepEqual(contradiction.products.map((x) => x.productId), ["black-velvet-roll-on"]);
   assert.match(errorsFor(contradiction.issues, 2), /SKU belongs to "Velvet Noir" but the name matches "Black Velvet"/);
 
   // Existing SKUs are never replaced.
@@ -235,7 +285,7 @@ console.log("6. Matching existing products safely...");
   const replace = planImport(file, [otherSku], { ...OFF, updateExisting: true });
   assert.match(errorsFor(replace.issues, 2), /already has SKU OLD-30; the file has LFT-004-SP-030/);
   assert.match(errorsFor(replace.issues, 3), /Held back/);
-  assert.equal(replace.products.length, 0, "the whole product is held back");
+  assert.deepEqual(replace.products.map((x) => x.productId), ["black-velvet-roll-on"], "the whole Perfume is held back");
 
   // A SKU on an archived variant is not silently revived.
   const archived = existingProduct("black-velvet", "Black Velvet", [{ sku: "LFT-004-SP-030", status: "ARCHIVED" }]);
@@ -248,7 +298,7 @@ console.log("6. Matching existing products safely...");
   const u = planImport(sameFile, [same], { ...OFF, updateExisting: true });
   assert.equal(u.products[0].action, "unchanged");
   assert.equal(u.totals.unchangedRows, 3);
-  console.log("   ✓ SKU → slug → name matching; contradictions and SKU replacements refused; updates opt-in");
+  console.log("   ✓ SKU → web address → name matching within the same type; cross-type SKUs and addresses refused; updates opt-in");
 }
 
 console.log("7. Fingerprint (what the admin confirmed)...");
@@ -316,20 +366,30 @@ await (async () => {
   const req = request(sheet(fragrance("BLACK VELVET", 4), fragrance("STONEWOOD", 1)), { ...OFF, activateNewProducts: true });
   const result = await confirmAndApply(repo, audit, req);
   assert.equal(result.status, "completed");
-  assert.deepEqual(result.applied.map((a) => [a.productId, a.action, a.variantsCreated]), [["black-velvet", "created", 4], ["stonewood", "created", 4]]);
+  assert.deepEqual(result.applied.map((a) => [a.productId, a.action, a.variantsCreated]), [
+    ["black-velvet", "created", 3],
+    ["black-velvet-roll-on", "created", 1],
+    ["stonewood", "created", 3],
+    ["stonewood-roll-on", "created", 1],
+  ]);
   const bv = (await getProductWithVariants(repo, "black-velvet"))!;
   assert.equal(bv.product.name, "Black Velvet");
   assert.equal(bv.product.category, "Perfumes");
   assert.equal(bv.product.productTypeId, "perfume-spray");
   assert.equal(bv.product.productTypeName, "Perfume Spray");
   assert.deepEqual(bv.product.notes.top.map((n) => n.name), ["Coffee", "Pear"]);
-  assert.equal(bv.variants.length, 4);
+  assert.equal(bv.variants.length, 3);
+  const ro = (await getProductWithVariants(repo, "black-velvet-roll-on"))!;
+  assert.deepEqual([ro.product.name, ro.product.productTypeId, ro.product.productTypeName, ro.product.category, ro.variants.length, ro.variants[0].sku], ["Black Velvet", "roll-on", "Roll-On", "Roll-On", 1, "LFT-004-RO-008"]);
 
   const shop = buildStorefrontCatalogue(await listAllProductsWithVariants(repo));
   const item = shop.find((p) => p.slug === "black-velvet")!;
   assert.ok(item, "visible on the storefront when activated");
   const options = toStorefrontOptions(bv.variants);
-  assert.deepEqual(options.map((o) => [o.label, o.priceInr, o.stockQuantity]), [["30 ml", 449, 100], ["50 ml", 749, 100], ["100 ml", 1299, 100], ["8 ml Roll-On", 229, 100]], "size selector, prices and stock");
+  assert.deepEqual(options.map((o) => [o.label, o.priceInr, o.stockQuantity]), [["30 ml", 449, 100], ["50 ml", 749, 100], ["100 ml", 1299, 100]], "Perfume size selector: sprays only");
+  const roItem = shop.find((p) => p.slug === "black-velvet-roll-on")!;
+  assert.deepEqual([roItem.format, roItem.displayName, item.format, item.displayName], ["roll-on", "Black Velvet Roll-On", "perfume", "Black Velvet"], "storefront sections and names");
+  assert.deepEqual(roItem.options.map((o) => [o.label, o.priceInr, o.stockQuantity]), [["8 ml", 229, 100]]);
 
   const again = await confirmAndApply(repo, audit, req);
   assert.equal(again.status, "nothing_to_import", "importing the same file twice changes nothing");
@@ -351,8 +411,8 @@ await (async () => {
   await createProduct(repo, audit, ACTOR, { id: "black-velvet", name: "Black Velvet", category: "Perfume", sizes: [30, 50, 100] });
   const before = (await getProductWithVariants(repo, "black-velvet"))!;
   const off = await confirmAndApply(repo, audit, request(sheet(fragrance("BLACK VELVET", 4))));
-  assert.equal(off.status, "nothing_to_import", "updates off: existing product untouched");
-  assert.deepEqual(await getProductWithVariants(repo, "black-velvet"), before);
+  assert.deepEqual(off.applied.map((a) => [a.productId, a.action]), [["black-velvet-roll-on", "created"]], "updates off: only the new Roll-On is created");
+  assert.deepEqual(await getProductWithVariants(repo, "black-velvet"), before, "existing Perfume untouched");
 
   const on = await confirmAndApply(repo, audit, request(sheet(fragrance("BLACK VELVET", 4)), { ...OFF, updateExisting: true }));
   assert.equal(on.status, "completed");
@@ -364,8 +424,10 @@ await (async () => {
   assert.equal(byLabel["30 ml"].priceInr, 449);
   assert.equal(byLabel["30 ml"].sku, "LFT-004-SP-030");
   assert.equal(byLabel["30 ml"].id, before.variants.find((v) => v.capacity === 30)!.id, "existing variant updated in place (same id)");
-  assert.equal(byLabel["8 ml Roll-On"].priceInr, 229);
+  assert.deepEqual(after.variants.map((v) => v.capacity).sort((a, b) => a! - b!), [30, 50, 100], "no Roll-On inside the Perfume");
   assert.equal(after.variants.filter((v) => v.status === "ARCHIVED").length, 0, "no variant archived");
+  const ro = (await getProductWithVariants(repo, "black-velvet-roll-on"))!;
+  assert.deepEqual([ro.product.productTypeId, ro.variants.length, ro.variants[0].priceInr], ["roll-on", 1, 229], "Roll-On is its own product");
   console.log("   ✓ existing product updated in place only with the option; nothing archived");
 })();
 
@@ -388,11 +450,18 @@ await (async () => {
   const original = (await getProductWithVariants(t.repo, "black-velvet"))!;
   const req2 = request(sheet(fragrance("STONEWOOD", 1), fragrance("BLACK VELVET", 4), fragrance("PURPLE SPORT", 2)), { ...OFF, updateExisting: true });
   const plan2 = buildPlan(req2, await loadImportContext(t.repo));
-  assert.deepEqual(plan2.products.map((p) => p.action), ["create", "update", "create"]);
+  assert.deepEqual(plan2.products.map((p) => [p.productId, p.action]), [
+    ["stonewood", "create"],
+    ["stonewood-roll-on", "create"],
+    ["black-velvet", "update"],
+    ["black-velvet-roll-on", "create"],
+    ["purple-sport", "create"],
+    ["purple-sport-roll-on", "create"],
+  ]);
   const send = t.client.send.bind(t.client);
   let transactions = 0;
   (t.client as unknown as { send: typeof send }).send = async (command) => {
-    if (command.constructor.name === "TransactWriteCommand" && ++transactions === 3) throw Object.assign(new Error("Simulated outage"), { name: "InternalServerError" });
+    if (command.constructor.name === "TransactWriteCommand" && ++transactions === 5) throw Object.assign(new Error("Simulated outage"), { name: "InternalServerError" });
     return send(command);
   };
   const failed = await applyImport(t.repo, t.audit, ACTOR, req2, plan2.fingerprint);
@@ -401,12 +470,12 @@ await (async () => {
   assert.equal(failed.failure?.productId, "purple-sport");
   assert.equal(failed.failure?.message, "The database rejected the change.", "no technical error text for the admin");
   assert.deepEqual(failed.rollbackProblems, []);
-  assert.equal(await getProductWithVariants(t.repo, "stonewood"), null, "created product removed");
+  for (const id of ["stonewood", "stonewood-roll-on", "black-velvet-roll-on"]) assert.equal(await getProductWithVariants(t.repo, id), null, `created product ${id} removed`);
   assert.equal(await getProductWithVariants(t.repo, "purple-sport"), null, "failed product never written");
   const restored = (await getProductWithVariants(t.repo, "black-velvet"))!;
   const strip = (x: Record<string, unknown>) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== "version" && k !== "updatedAt"));
   assert.deepEqual(strip(restored.product), strip(original.product), "updated product restored to its previous values");
-  assert.deepEqual(restored.variants.map(strip).sort((a, b) => String(a.sk).localeCompare(String(b.sk))), original.variants.map(strip).sort((a, b) => String(a.sk).localeCompare(String(b.sk))), "variants restored; added Roll-On removed");
+  assert.deepEqual(restored.variants.map(strip).sort((a, b) => String(a.sk).localeCompare(String(b.sk))), original.variants.map(strip).sort((a, b) => String(a.sk).localeCompare(String(b.sk))), "variants restored exactly");
   assert.ok(restored.product.version > original.product.version, "versions keep increasing (no silent overwrite of later edits)");
   console.log("   ✓ stale review refused; mid-import failure rolled back exactly; friendly failure message");
 })();

@@ -427,10 +427,10 @@ console.log("7. Testing Validation Limits...");
     });
   });
 
-  // Cannot have > 10 notes per tier
+  // Cannot have > 12 notes per tier (MAX_NOTES_PER_GROUP; raised from 10 for Afghan Tiger's 11 Base notes)
   assert.throws(() => {
     fragranceNotesSchema.parse({
-      top: Array.from({ length: 11 }, (_, i) => ({
+      top: Array.from({ length: 13 }, (_, i) => ({
         id: `note_${i}`,
         name: `Note ${i}`,
       })),

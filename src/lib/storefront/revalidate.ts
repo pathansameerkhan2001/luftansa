@@ -13,6 +13,9 @@ import { revalidatePath } from "next/cache";
 export function revalidateStorefront(productId?: string): void {
   try {
     revalidatePath("/");
+    // Section listings (Perfumes, Roll-On).
+    revalidatePath("/perfumes");
+    revalidatePath("/roll-on");
     if (productId) revalidatePath(`/products/${productId}`);
     // Covers every other product page (e.g. collection membership changes).
     revalidatePath("/products/[slug]", "page");

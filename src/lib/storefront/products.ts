@@ -2,6 +2,7 @@ import "server-only";
 
 import type { BottleSizeMl, ProductOption } from "@/data/products";
 import { getNoteImage } from "@/data/fragrance-profiles";
+import { displayName, productFormat, type ProductFormat } from "@/lib/catalogue/product-format";
 import { buildLegacyCatalogue } from "@/lib/catalogue/legacy-catalogue";
 import { getDataServices } from "@/lib/db/client";
 import { getProductWithVariants, listAllProductsWithVariants } from "@/lib/db/products-service";
@@ -20,6 +21,10 @@ export interface StorefrontNote {
 export interface UnifiedStorefrontProduct {
   slug: string;
   name: string;
+  /** Storefront section: "perfume" (sprays), "roll-on", or "other" (in neither section). */
+  format: ProductFormat;
+  /** Customer-facing name, e.g. "Black Velvet Roll-On" for a Roll-On (src/lib/catalogue/product-format.ts). */
+  displayName: string;
   description?: string;
   category: string;
   productTypeId?: string;
@@ -109,6 +114,8 @@ export function mapProductToStorefront(
   return {
     slug: product.id,
     name: product.name,
+    format: productFormat(product.productTypeId),
+    displayName: displayName(product.name, product.productTypeId),
     description: product.description,
     category: product.category,
     productTypeId: product.productTypeId,
@@ -197,10 +204,11 @@ export async function getActiveStorefrontProductBySlug(
 export function toStorefrontCardData(product: UnifiedStorefrontProduct): ProductCardData {
   return {
     slug: product.slug,
-    name: product.name,
+    name: product.displayName,
     description: product.description,
     href: productHref(product.slug),
     options: product.options,
     image: product.mainImage,
+    placeholder: product.format === "roll-on" ? "roll-on" : "spray",
   };
 }
