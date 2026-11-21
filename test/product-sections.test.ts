@@ -160,7 +160,8 @@ console.log("7. Notes: up to 12 per group...");
 console.log("8. Navigation: only pages that exist...");
 {
   assert.deepEqual(PRIMARY_NAV.map((n) => n.label), ["Home", "Perfumes", "Roll-On", "Our Story", "Contact Us"]);
-  assert.ok(!PRIMARY_NAV.some((n) => /^\/(shop|collections|our-story|contact)\b/.test(n.href)), "no links to pages that do not exist");
+  assert.ok(!PRIMARY_NAV.some((n) => /^\/(shop|collections|contact)\b/.test(n.href)), "no links to pages that do not exist");
+  assert.equal(PRIMARY_NAV.find((n) => n.label === "Our Story")?.href, "/our-story", "Our Story opens its page (src/app/our-story/page.tsx)");
   assert.equal(SHOW_WISHLIST_ICON, false, "wishlist icon hidden until /wishlist exists");
   console.log("   ✓ Home, Perfumes, Roll-On, Our Story, Contact Us");
 }
