@@ -4,11 +4,12 @@
  * the Media Library's "where used" check scans every module listed here.
  */
 import { ANNOUNCEMENT_MODULE } from "./modules/announcement-bar";
+import { BRAND_STORY_MODULE } from "./modules/brand-story";
 import { HERO_MODULE } from "./modules/hero";
 import { REELS_MODULE, REELS_SECTION_MODULE } from "./modules/reels";
 import type { CmsModuleDefinition } from "./schemas";
 
-export const CMS_MODULES: readonly CmsModuleDefinition[] = [HERO_MODULE, ANNOUNCEMENT_MODULE, REELS_SECTION_MODULE, REELS_MODULE];
+export const CMS_MODULES: readonly CmsModuleDefinition[] = [HERO_MODULE, ANNOUNCEMENT_MODULE, REELS_SECTION_MODULE, REELS_MODULE, BRAND_STORY_MODULE];
 
 export function getCmsModule(id: string, modules: readonly CmsModuleDefinition[] = CMS_MODULES): CmsModuleDefinition | undefined {
   return modules.find((m) => m.id === id);

@@ -37,6 +37,7 @@ export function TextField({
   multiline,
   required,
   placeholder,
+  rows = 2,
 }: {
   id: string;
   label: string;
@@ -48,6 +49,8 @@ export function TextField({
   multiline?: boolean;
   required?: boolean;
   placeholder?: string;
+  /** Visible lines for a multiline field (default 2). */
+  rows?: number;
 }) {
   const describedBy = [help ? `${id}-help` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   const common = {
@@ -70,7 +73,7 @@ export function TextField({
           {value.length}/{max}
         </span>
       </div>
-      {multiline ? <textarea {...common} rows={2} /> : <input type="text" {...common} />}
+      {multiline ? <textarea {...common} rows={rows} /> : <input type="text" {...common} />}
       {help ? (
         <p id={`${id}-help`} className="mt-1 text-[12px] leading-snug text-brand-text/55">
           {help}
