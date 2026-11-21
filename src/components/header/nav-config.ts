@@ -5,15 +5,16 @@ export interface NavItem {
 
 /**
  * Primary navigation. Single source of truth for desktop + mobile menus.
- * Only destinations that exist: "Our Story" opens the brand story on the
- * homepage and "Contact Us" the contact details in the footer (on every page)
- * until dedicated /our-story and /contact pages are built.
+ * Only destinations that exist: "Our Story" opens /our-story (which sends
+ * visitors to the homepage brand story while it is deactivated in Admin) and
+ * "Contact Us" the contact details in the footer (on every page) until a
+ * dedicated /contact page is built.
  */
 export const PRIMARY_NAV: readonly NavItem[] = [
   { label: "Home", href: "/" },
   { label: "Perfumes", href: "/perfumes" },
   { label: "Roll-On", href: "/roll-on" },
-  { label: "Our Story", href: "/#brand-story-heading" },
+  { label: "Our Story", href: "/our-story" },
   { label: "Contact Us", href: "#footer-contact" },
 ];
 

@@ -19,11 +19,8 @@ export const PRODUCT_DETAIL_ROUTE: RouteBuilder = (slug) => `/products/${slug}`;
 /** Collection listing page. Not built yet. */
 export const COLLECTION_ROUTE: RouteBuilder = null;
 
-/**
- * About Us / Our Story page. Not built yet (the header already points at
- * "/our-story"); set to that path once src/app/our-story/page.tsx exists.
- */
-export const ABOUT_ROUTE: string | null = null;
+/** About Us / Our Story page: src/app/our-story/page.tsx (Admin → Website → Our Story). */
+export const ABOUT_ROUTE: string | null = "/our-story";
 
 const PRODUCT_SLUGS = new Set(PRODUCTS.map((p) => p.slug));
 
