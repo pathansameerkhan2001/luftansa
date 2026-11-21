@@ -1,6 +1,8 @@
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { productPageFaqs } from "@/data/faqs";
+import type { TrustTagView } from "@/lib/cms/modules/trust-tags";
+import { TrustTags } from "./TrustTags";
 import type { ProductDetailData } from "./types";
 
 /**
@@ -46,7 +48,8 @@ function Section({ title, defaultOpen, children }: { title: string; defaultOpen?
   );
 }
 
-export function ProductInfoSections({ product }: { product: ProductDetailData }) {
+/** `trustTags`: the global quality tags (Admin → Product Trust Tags), the same on every product page. */
+export function ProductInfoSections({ product, trustTags = [] }: { product: ProductDetailData; trustTags?: readonly TrustTagView[] }) {
   const notes = hasAnyNotes(product) ? product.fragranceNotes : undefined;
   const details: [string, string][] = [
     ["Fragrance", product.name],
@@ -102,6 +105,7 @@ export function ProductInfoSections({ product }: { product: ProductDetailData })
             </div>
           ))}
         </dl>
+        <TrustTags tags={trustTags} />
       </Section>
 
       <Section title="How to Use & Care">

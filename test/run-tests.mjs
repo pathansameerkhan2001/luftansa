@@ -56,3 +56,6 @@ await jiti.import("./brand-story.test.ts");
 
 console.log("\nLoading home-collections.test.ts via jiti...");
 await jiti.import("./home-collections.test.ts");
+
+console.log("\nLoading trust-tags.test.ts via jiti...");
+await jiti.import("./trust-tags.test.ts");

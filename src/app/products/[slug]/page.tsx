@@ -11,6 +11,8 @@ import { RelatedFragrances } from "@/components/product/RelatedFragrances";
 import type { ProductDetailData } from "@/components/product/types";
 import { STORE_NAME } from "@/data/store";
 import { FORMAT_LABEL, SECTION_LABEL, SECTION_ROUTE } from "@/lib/catalogue/product-format";
+import { loadPublished } from "@/lib/cms/loader";
+import { resolveTrustTags, TRUST_TAGS_DEFAULT, TRUST_TAGS_MODULE, toTrustTagsView } from "@/lib/cms/modules/trust-tags";
 import { selectRelated } from "@/lib/storefront/collections";
 import { productJsonLd, productMetaDescription } from "@/lib/storefront/product-seo";
 import {
@@ -91,6 +93,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   // Related products stay within the same section (Perfumes with Perfumes, Roll-Ons with Roll-Ons).
   const sameSection = (await getActiveStorefrontProducts()).filter((p) => p.format === product.format);
   const related = selectRelated(sameSection, product, 4).map(toStorefrontCardData);
+  // Global quality tags: never product data, so every product (new, imported, Perfume or Roll-On) shows them.
+  const trustTags = await loadPublished(TRUST_TAGS_MODULE, [TRUST_TAGS_DEFAULT]).then(resolveTrustTags, () => toTrustTagsView(TRUST_TAGS_DEFAULT));
   const section = product.format === "other" ? null : product.format;
   const seoProduct = { ...product, name: product.displayName, category: data.category };
 
@@ -134,7 +138,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               <DeliveryInfo productName={data.name} />
             </div>
             <div className="mt-8">
-              <ProductInfoSections product={data} />
+              <ProductInfoSections product={data} trustTags={trustTags} />
             </div>
           </div>
         </div>

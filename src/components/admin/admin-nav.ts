@@ -10,6 +10,7 @@ import {
   Package,
   PanelTop,
   Settings,
+  ShieldCheck,
   ShoppingCart,
   Tag,
   Users,
@@ -34,6 +35,7 @@ const HERO: AdminNavItem = { label: "Hero Section", href: "/admin/hero", Icon: P
 const ANNOUNCEMENT: AdminNavItem = { label: "Announcement Bar", href: "/admin/announcement-bar", Icon: Megaphone, description: "Messages in the bar above the header: order, schedule and display." };
 const BRAND_STORY: AdminNavItem = { label: "Brand Story", href: "/admin/brand-story", Icon: BookOpen, description: "Homepage “Our Brand” section: image, story, button and layout." };
 const COLLECTIONS: AdminNavItem = { label: "Homepage Collections", href: "/admin/collections", Icon: LayoutGrid, description: "Personality and Roll-On collections: products, headings, badges and design." };
+const TRUST_TAGS: AdminNavItem = { label: "Product Trust Tags", href: "/admin/trust-tags", Icon: ShieldCheck, description: "Quality tags on every product page: labels, order and visibility." };
 const REELS: AdminNavItem = { label: "Instagram Reels", href: "/admin/reels", Icon: Clapperboard, description: "Homepage Reels: videos, posters, order and visibility." };
 const MEDIA: AdminNavItem = { label: "Media Library", href: "/admin/media", Icon: ImageIcon, description: "Images and videos, usage and safe deletion." };
 
@@ -44,7 +46,7 @@ const MEDIA: AdminNavItem = { label: "Media Library", href: "/admin/media", Icon
  */
 export const ADMIN_NAV_GROUPS: readonly AdminNavGroup[] = [
   { label: "Store Management", items: [DASHBOARD, PRODUCTS] },
-  { label: "Website", items: [HERO, ANNOUNCEMENT, COLLECTIONS, BRAND_STORY, REELS] },
+  { label: "Website", items: [HERO, ANNOUNCEMENT, COLLECTIONS, BRAND_STORY, REELS, TRUST_TAGS] },
   { label: "Media", items: [MEDIA] },
 ];
 
