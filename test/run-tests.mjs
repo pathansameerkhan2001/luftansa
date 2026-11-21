@@ -38,3 +38,6 @@ await jiti.import("./homepage-cms.test.ts");
 
 console.log("\nLoading announcement-bar.test.ts via jiti...");
 await jiti.import("./announcement-bar.test.ts");
+
+console.log("\nLoading preview-isolation.test.ts via jiti...");
+await jiti.import("./preview-isolation.test.ts");

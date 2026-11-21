@@ -24,3 +24,11 @@ export function awsCredentials() {
   if (!roleArn) return undefined;
   return awsCredentialsProvider({ roleArn, roleSessionName: "luftansa-app" });
 }
+
+/**
+ * Credentials from one specific OIDC role, never the default chain (used by
+ * Vercel Preview, which must not pick up long-lived keys from the environment).
+ */
+export function oidcRoleCredentials(roleArn: string) {
+  return awsCredentialsProvider({ roleArn, roleSessionName: "luftansa-preview" });
+}

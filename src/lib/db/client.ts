@@ -2,7 +2,7 @@ import "server-only";
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { awsCredentials } from "../aws/credentials";
+import { awsCredentials, oidcRoleCredentials } from "../aws/credentials";
 import { AuditService } from "./audit";
 import { getDbConfig } from "./config";
 import { Repository } from "./repository";
@@ -12,8 +12,9 @@ let documentClient: DynamoDBDocumentClient | null = null;
 
 /**
  * Server-only DynamoDB document client, or null when no database is available.
- * Outside Vercel production this only ever connects to a localhost DynamoDB
- * Local endpoint with dummy credentials (see ./target.ts).
+ * Locally this only ever connects to a localhost DynamoDB Local endpoint with
+ * dummy credentials; a Vercel Preview only to its Preview table through its
+ * OIDC role (see ./target.ts). Production is unchanged.
  */
 export function getDocumentClient(): DynamoDBDocumentClient | null {
   const config = getDbConfig();
@@ -24,7 +25,9 @@ export function getDocumentClient(): DynamoDBDocumentClient | null {
     const client =
       target.kind === "local"
         ? new DynamoDBClient({ region: config.region, endpoint: target.endpoint, credentials: target.credentials, maxAttempts: 2 })
-        : new DynamoDBClient({ region: config.region, credentials: awsCredentials(), maxAttempts: 3 });
+        : target.kind === "preview"
+          ? new DynamoDBClient({ region: config.region, credentials: oidcRoleCredentials(target.roleArn), maxAttempts: 3 })
+          : new DynamoDBClient({ region: config.region, credentials: awsCredentials(), maxAttempts: 3 });
     documentClient = DynamoDBDocumentClient.from(client, {
       marshallOptions: { removeUndefinedValues: true, convertClassInstanceToMap: false },
     });

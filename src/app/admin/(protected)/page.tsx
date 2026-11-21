@@ -323,6 +323,20 @@ export default async function AdminDashboardPage() {
 
         <ul className="mt-2 divide-y divide-[#efe6d4]">
           <StatusRow
+            ok={status.deployment !== "preview" || status.isolationProblems.length === 0}
+            label="Deployment environment"
+            detail={
+              status.deployment === "production"
+                ? "Production."
+                : status.deployment === "local"
+                  ? "Local development: local database and media only."
+                  : status.isolationProblems.length === 0
+                    ? "Preview: isolated Preview database and media (production resources are refused)."
+                    : `Preview: database and media are disabled until isolation is complete. ${status.isolationProblems.join(". ")}.`
+            }
+            icon={ShieldCheck}
+          />
+          <StatusRow
             ok
             label="Administrator authentication"
             detail="Amazon Cognito. This session is verified on every request."

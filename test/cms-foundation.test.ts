@@ -72,7 +72,9 @@ console.log("2. DynamoDB: local runtime can never reach production...");
     assert.deepEqual(local.credentials, { accessKeyId: "local", secretAccessKey: "local" }, "dummy credentials, never the env AWS keys");
   }
   assert.throws(() => resolveDbTarget({ DYNAMODB_ENDPOINT: "https://dynamodb.ap-south-2.amazonaws.com" }), LocalSafetyError);
-  assert.equal(resolveDbTarget({ VERCEL: "1", NODE_ENV: "production", DYNAMODB_ENDPOINT: "http://127.0.0.1:8000" }).kind, "production");
+  assert.equal(resolveDbTarget({ VERCEL: "1", NODE_ENV: "production", VERCEL_ENV: "production", DYNAMODB_ENDPOINT: "http://127.0.0.1:8000" }).kind, "production");
+  // Without VERCEL_ENV=production a Vercel build is treated as an isolated Preview (test/preview-isolation.test.ts).
+  assert.equal(resolveDbTarget({ VERCEL: "1", NODE_ENV: "production", DYNAMODB_ENDPOINT: "http://127.0.0.1:8000" }).kind, "disabled");
   const saved = process.env.DYNAMODB_ENDPOINT;
   delete process.env.DYNAMODB_ENDPOINT;
   assert.equal(getDataServices(), null, "app data services are unavailable locally without DynamoDB Local");
