@@ -53,3 +53,6 @@ await jiti.import("./reels.test.ts");
 
 console.log("\nLoading brand-story.test.ts via jiti...");
 await jiti.import("./brand-story.test.ts");
+
+console.log("\nLoading home-collections.test.ts via jiti...");
+await jiti.import("./home-collections.test.ts");

@@ -188,6 +188,8 @@ export function ProductManager({
   const [formConcentration, setFormConcentration] = useState(initialActiveProduct?.concentration ?? "");
   const [formFeatured, setFormFeatured] = useState(initialActiveProduct?.featured ?? false);
   const [formBestseller, setFormBestseller] = useState(initialActiveProduct?.bestseller ?? false);
+  const [formNewLaunch, setFormNewLaunch] = useState(initialActiveProduct?.newLaunch ?? false);
+  const [formBuyOneGetOne, setFormBuyOneGetOne] = useState(initialActiveProduct?.buyOneGetOne ?? false);
   const [formCollections, setFormCollections] = useState<StorefrontCollection[]>(initialActiveProduct?.collections ?? []);
   const [formDisplayOrder, setFormDisplayOrder] = useState<string>(
     initialActiveProduct?.displayOrder !== undefined ? String(initialActiveProduct.displayOrder) : "",
@@ -463,6 +465,8 @@ export function ProductManager({
     setFormConcentration("");
     setFormFeatured(false);
     setFormBestseller(false);
+    setFormNewLaunch(false);
+    setFormBuyOneGetOne(false);
     setFormCollections([]);
     setFormDisplayOrder("");
     setUnverifiedFields([]);
@@ -494,6 +498,8 @@ export function ProductManager({
     setFormConcentration(product.concentration || "");
     setFormFeatured(product.featured || false);
     setFormBestseller(product.bestseller || false);
+    setFormNewLaunch(product.newLaunch || false);
+    setFormBuyOneGetOne(product.buyOneGetOne || false);
     setFormCollections(product.collections ?? []);
     setFormDisplayOrder(product.displayOrder !== undefined ? String(product.displayOrder) : "");
     setUnverifiedFields(product.unverifiedFields ?? []);
@@ -526,6 +532,8 @@ export function ProductManager({
           setFormConcentration(fresh.concentration || "");
           setFormFeatured(fresh.featured || false);
           setFormBestseller(fresh.bestseller || false);
+          setFormNewLaunch(fresh.newLaunch || false);
+          setFormBuyOneGetOne(fresh.buyOneGetOne || false);
           setFormCollections(fresh.collections ?? []);
           setFormDisplayOrder(fresh.displayOrder !== undefined ? String(fresh.displayOrder) : "");
           setUnverifiedFields(fresh.unverifiedFields ?? []);
@@ -702,6 +710,8 @@ export function ProductManager({
           concentration: formConcentration.trim() || undefined,
           featured: formFeatured,
           bestseller: formBestseller,
+          newLaunch: formNewLaunch,
+          buyOneGetOne: formBuyOneGetOne,
           collections: formCollections,
           displayOrder: displayOrderValue ?? undefined,
           unverifiedFields,
@@ -742,6 +752,8 @@ export function ProductManager({
           concentration: formConcentration.trim() || null,
           featured: formFeatured,
           bestseller: formBestseller,
+          newLaunch: formNewLaunch,
+          buyOneGetOne: formBuyOneGetOne,
           collections: formCollections,
           displayOrder: displayOrderValue,
           unverifiedFields,
@@ -1109,6 +1121,12 @@ export function ProductManager({
                                 <Sparkles className="h-2.5 w-2.5" /> Featured
                               </span>
                             )}
+                            {p.newLaunch && (
+                              <span className="mt-0.5 ml-1 inline-flex items-center rounded bg-[#F6E7E5] px-1.5 py-0.2 text-[10px] font-medium text-[#7A1F1F]">New Launch</span>
+                            )}
+                            {p.buyOneGetOne && (
+                              <span className="mt-0.5 ml-1 inline-flex items-center rounded bg-[#F7EBC8] px-1.5 py-0.2 text-[10px] font-medium text-[#5C4A1E]">Buy 1 Get 1</span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1360,7 +1378,32 @@ export function ProductManager({
                     />
                     <span className="font-medium text-[#292D27]">Bestseller</span>
                   </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formNewLaunch}
+                      onChange={(e) => setFormNewLaunch(e.target.checked)}
+                      className="rounded border-[#E8E4DA] text-[#C6A76A] focus:ring-[#C6A76A]"
+                      data-field="new-launch"
+                    />
+                    <span className="font-medium text-[#292D27]">New Launch</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formBuyOneGetOne}
+                      onChange={(e) => setFormBuyOneGetOne(e.target.checked)}
+                      className="rounded border-[#E8E4DA] text-[#C6A76A] focus:ring-[#C6A76A]"
+                      data-field="buy-one-get-one"
+                    />
+                    <span className="font-medium text-[#292D27]">Buy 1 Get 1 Free</span>
+                  </label>
                 </div>
+                <p className="-mt-1 text-[11px] text-[#78716C]">
+                  Bestseller, New Launch and Buy 1 Get 1 Free appear as badges on the homepage collection cards (Admin → Homepage Collections).
+                </p>
 
                 <div className="rounded-lg border border-[#E8E4DA] bg-[#FFFDF8] p-3 text-xs">
                   <div className="text-[11px] font-semibold text-[#292D27]">Homepage placement</div>

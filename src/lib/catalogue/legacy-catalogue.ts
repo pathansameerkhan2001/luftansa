@@ -141,6 +141,8 @@ function toEntry(product: Product, index: number, options: LegacyCatalogueOption
     gender: product.gender,
     featured: false,
     bestseller: (BEST_SELLER_SLUGS as readonly string[]).includes(product.slug),
+    newLaunch: false,
+    buyOneGetOne: false,
     collections: collectionsFor(product.slug),
     displayOrder: index,
     unverifiedFields: unverified.length > 0 ? unverified : undefined,

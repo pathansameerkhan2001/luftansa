@@ -1,58 +1,44 @@
-import { getAssetUrl } from "@/lib/assets";
+import { Reveal } from "@/components/motion/Reveal";
+import { loadPublished } from "@/lib/cms/loader";
+import { HOME_COLLECTIONS_DEFAULT, HOME_COLLECTIONS_MODULE, resolveHomeCollections, toHomeCollectionsView, type HomeCollectionsView as View } from "@/lib/cms/modules/home-collections";
 import { productHref } from "@/lib/routes";
-import { sprayOptions, type Product } from "@/data/products";
-import { bySection, SECTION_ROUTE } from "@/lib/catalogue/product-format";
-import { selectPersonality, sortByDisplayOrder } from "@/lib/storefront/collections";
-import { getActiveStorefrontProducts, toStorefrontCardData } from "@/lib/storefront/products";
+import { getActiveStorefrontProducts } from "@/lib/storefront/products";
 import { CollectionPanel } from "./CollectionPanel";
-import type { ProductCardData } from "./ProductCard";
-
-/** Spray perfumes: confirmed sizes priced from the standard price list (+ configured MRP/offers). */
-export function toSprayCardData(product: Product): ProductCardData {
-  const { slug, name, description, image } = product;
-  return {
-    slug,
-    name,
-    description,
-    href: productHref(slug),
-    options: sprayOptions(product),
-    image: image ? { src: getAssetUrl(image.key), alt: image.alt, objectPosition: image.objectPosition } : undefined,
-  };
-}
 
 /**
- * Homepage collections: Personality (Perfumes only) and Roll On (Roll-On
- * products only), side by side from xl. The Roll On panel is left out while
- * no Roll-On product is active, so the Perfumes panel then spans the row.
+ * The two collection panels side by side from xl (stacked below, in the
+ * configured order). A single panel is centred at half width so its cards keep
+ * their size. Renders nothing when there is nothing to show (no gap).
  */
-export async function HomeCollections() {
-  const sections = bySection(await getActiveStorefrontProducts());
-
-  // "personality" members first, then every other active Perfume (existing homepage behaviour).
-  const personality = selectPersonality(sections.perfume).map(toStorefrontCardData);
-  const rollOns = sortByDisplayOrder(sections["roll-on"]).map(toStorefrontCardData);
-
+export function HomeCollectionsView({ view }: { view: View }) {
+  if (view.panels.length === 0) return null;
+  const single = view.panels.length === 1;
   return (
-    <div className="bg-brand-cream">
-      <div className={`mx-auto grid max-w-[1600px] grid-cols-1 gap-10 px-4 pt-12 pb-14 sm:px-8 sm:pt-16 sm:pb-20 xl:gap-8 2xl:gap-10 ${rollOns.length ? "xl:grid-cols-2" : ""}`}>
-        <CollectionPanel
-          id="personality-collection"
-          title="Personality Collection"
-          subtitle="Distinctive fragrances that reflect your unique style."
-          products={personality}
-          viewAll={{ href: SECTION_ROUTE.perfume, label: "View all perfumes" }}
-        />
-        {rollOns.length ? (
-          <CollectionPanel
-            id="roll-on-collection"
-            title="Roll On Collection"
-            subtitle="Discover your favourite fragrances in a convenient roll-on format."
-            products={rollOns}
-            placeholder="roll-on"
-            viewAll={{ href: SECTION_ROUTE["roll-on"], label: "View all roll-ons" }}
-          />
-        ) : null}
+    <div className="bg-brand-cream" data-home-collections>
+      <div className={`mx-auto grid grid-cols-1 gap-8 px-4 pt-10 pb-12 sm:gap-10 sm:px-8 sm:pt-14 sm:pb-16 xl:gap-8 2xl:gap-10 ${single ? "max-w-[880px]" : "max-w-[1600px] xl:grid-cols-2"}`}>
+        {view.panels.map((panel, i) => (
+          <Reveal key={panel.key} className="group/reveal h-full" delayMs={i * 140}>
+            <CollectionPanel panel={panel} decorative={view.decorative} imageRatio={view.imageRatio} badgePosition={view.badgePosition} />
+          </Reveal>
+        ))}
       </div>
     </div>
   );
+}
+
+/** Product detail page of a card. */
+export const cardHref = (slug: string) => productHref(slug) ?? `/products/${slug}`;
+
+/**
+ * Homepage collections: Personality (Perfumes only) and Roll On (Roll-On
+ * products only), managed in Admin → Homepage Collections. Product facts come
+ * from Admin → Products; the CMS record chooses the products and the look.
+ */
+export async function HomeCollections() {
+  const [settings, products] = await Promise.all([
+    loadPublished(HOME_COLLECTIONS_MODULE, [HOME_COLLECTIONS_DEFAULT]).then(resolveHomeCollections, () => HOME_COLLECTIONS_DEFAULT),
+    getActiveStorefrontProducts(),
+  ]);
+  if (!settings) return null; // deactivated
+  return <HomeCollectionsView view={toHomeCollectionsView(settings, products, cardHref)} />;
 }
