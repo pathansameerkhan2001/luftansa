@@ -47,3 +47,6 @@ await jiti.import("./excel-import.test.ts");
 
 console.log("\nLoading product-sections.test.ts via jiti...");
 await jiti.import("./product-sections.test.ts");
+
+console.log("\nLoading reels.test.ts via jiti...");
+await jiti.import("./reels.test.ts");

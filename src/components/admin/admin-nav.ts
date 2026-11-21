@@ -3,6 +3,7 @@ import {
   FileText,
   ImageIcon,
   LayoutDashboard,
+  Clapperboard,
   Megaphone,
   Package,
   PanelTop,
@@ -29,6 +30,7 @@ const DASHBOARD: AdminNavItem = { label: "Dashboard", href: "/admin", Icon: Layo
 const PRODUCTS: AdminNavItem = { label: "Products", href: "/admin/products", Icon: Package, description: "Fragrances, sizes, prices, images and SEO." };
 const HERO: AdminNavItem = { label: "Hero Section", href: "/admin/hero", Icon: PanelTop, description: "Homepage hero images, videos, heading and button." };
 const ANNOUNCEMENT: AdminNavItem = { label: "Announcement Bar", href: "/admin/announcement-bar", Icon: Megaphone, description: "Messages in the bar above the header: order, schedule and display." };
+const REELS: AdminNavItem = { label: "Instagram Reels", href: "/admin/reels", Icon: Clapperboard, description: "Homepage Reels: videos, posters, order and visibility." };
 const MEDIA: AdminNavItem = { label: "Media Library", href: "/admin/media", Icon: ImageIcon, description: "Images and videos, usage and safe deletion." };
 
 /**
@@ -38,7 +40,7 @@ const MEDIA: AdminNavItem = { label: "Media Library", href: "/admin/media", Icon
  */
 export const ADMIN_NAV_GROUPS: readonly AdminNavGroup[] = [
   { label: "Store Management", items: [DASHBOARD, PRODUCTS] },
-  { label: "Website", items: [HERO, ANNOUNCEMENT] },
+  { label: "Website", items: [HERO, ANNOUNCEMENT, REELS] },
   { label: "Media", items: [MEDIA] },
 ];
 

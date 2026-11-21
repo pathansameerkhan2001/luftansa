@@ -1,103 +1,86 @@
+import { Reveal } from "@/components/motion/Reveal";
 import { getAssetUrl } from "@/lib/assets";
-import { collectionHref, isCatalogueProduct, productHref } from "@/lib/routes";
-import { INSTAGRAM_PROFILE_URL, REEL_PLACEHOLDER_COUNT, REELS, type Reel } from "@/data/reels";
+import { loadPublished } from "@/lib/cms/loader";
+import { REELS_MODULE, REELS_SECTION_DEFAULT, REELS_SECTION_MODULE, resolveReelsSection, type ReelsSectionView } from "@/lib/cms/modules/reels";
+import { productHref } from "@/lib/routes";
+import { getActiveStorefrontProducts } from "@/lib/storefront/products";
 import { InstagramGlyph } from "./InstagramGlyph";
-import { ReelsCarousel, type ResolvedReel } from "./ReelsCarousel";
+import { ReelsCarousel } from "./ReelsCarousel";
 
-/**
- * Resolve each Reel's call to action:
- * - confirmed product + product page exists  -> "Shop Now" to that product
- * - else confirmed collection + page exists  -> "Explore Collection"
- * - otherwise no button (never a guessed or broken link)
- */
-function resolveReel(reel: Reel): ResolvedReel {
-  if (reel.productSlug && !isCatalogueProduct(reel.productSlug) && process.env.NODE_ENV !== "production") {
-    console.warn(`[reels] "${reel.id}" references unknown product "${reel.productSlug}"; no Shop Now link shown.`);
+/** Loads the section from the CMS. null (section hidden) on any problem: never a broken or empty section. */
+async function loadReelsSection(): Promise<ReelsSectionView | null> {
+  try {
+    const [section, reels, products] = await Promise.all([
+      loadPublished(REELS_SECTION_MODULE, [REELS_SECTION_DEFAULT]),
+      loadPublished(REELS_MODULE, []),
+      getActiveStorefrontProducts(),
+    ]);
+    const active = new Map(products.flatMap((p) => {
+      const href = productHref(p.slug);
+      return href ? [[p.slug, { href, name: p.displayName }] as const] : [];
+    }));
+    return resolveReelsSection(section, reels, getAssetUrl, active);
+  } catch (e) {
+    console.error("[reels] section could not be loaded; hidden:", (e as Error).message);
+    return null;
   }
-  const shop = productHref(reel.productSlug);
-  const explore = shop ? undefined : collectionHref(reel.collectionSlug);
-  const thumbSrc = reel.thumbnail?.key ? getAssetUrl(reel.thumbnail.key) : reel.thumbnail?.src;
-
-  return {
-    id: reel.id,
-    title: reel.title,
-    instagramUrl: reel.instagramUrl,
-    thumbnail: thumbSrc ? { src: thumbSrc, alt: reel.thumbnail?.alt ?? reel.title } : undefined,
-    cta: shop
-      ? { kind: "shop", href: shop, label: "Shop Now" }
-      : explore
-        ? { kind: "collection", href: explore, label: "Explore Collection" }
-        : undefined,
-  };
-}
-
-/** Neutral, non-interactive cards shown until real Reels are configured. */
-function placeholderReels(count: number): ResolvedReel[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: `placeholder-${i + 1}`,
-    title: "Luftansa Reel coming soon",
-    placeholder: true,
-  }));
 }
 
 /**
- * "On Instagram / Luftansa Fragrance Moments" (Server Component). Always
- * rendered: real Reels when configured, otherwise "coming soon" placeholders.
+ * "On Instagram" Reels section (Server Component), managed in Admin →
+ * Instagram Reels. Hidden when the section is deactivated, when no Reel is
+ * active, or when the content cannot be loaded.
  */
-export function InstagramReels({ reels = REELS }: { reels?: readonly Reel[] }) {
-  const isPlaceholder = reels.length === 0;
-  const items = isPlaceholder ? placeholderReels(REEL_PLACEHOLDER_COUNT) : reels.map(resolveReel);
+export async function InstagramReels() {
+  const view = await loadReelsSection();
+  if (!view) return null;
 
   return (
-    <section aria-labelledby="reels-heading" className="relative overflow-hidden bg-brand-ivory">
+    <section aria-labelledby="reels-heading" className="relative overflow-hidden bg-brand-ivory" data-reels-section>
       {/* Soft silk-like sweep along the bottom edge. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-[radial-gradient(120%_100%_at_50%_120%,rgba(198,167,106,0.18),rgba(198,167,106,0)_70%)]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-[radial-gradient(120%_100%_at_50%_120%,rgba(198,167,106,0.2),rgba(198,167,106,0)_70%)]"
       />
-      <div className="relative mx-auto max-w-[1600px] px-4 pt-14 pb-16 sm:px-8 sm:pt-20 sm:pb-20">
-        <header className="mx-auto max-w-3xl text-center">
-          <InstagramGlyph className="mx-auto size-9 sm:size-10" />
-          <div className="mt-3 flex items-center justify-center gap-4 sm:gap-6">
-            <span aria-hidden="true" className="h-px w-12 bg-gradient-to-r from-transparent to-brand-gold/80 min-[400px]:w-20 sm:w-40" />
-            <p className="text-[11px] font-semibold tracking-[0.34em] whitespace-nowrap text-brand-black uppercase sm:text-[12px]">
-              On Instagram
-            </p>
-            <span aria-hidden="true" className="h-px w-12 bg-gradient-to-l from-transparent to-brand-gold/80 min-[400px]:w-20 sm:w-40" />
-          </div>
-          <h2
-            id="reels-heading"
-            className="mt-2 font-serif text-[34px] leading-[1.08] font-semibold italic tracking-[-0.01em] text-balance text-brand-black min-[400px]:text-[38px] sm:text-[46px] lg:text-[54px]"
-          >
-            Luftansa Fragrance Moments
-          </h2>
-          <p className="mx-auto mt-3 max-w-xl text-[14.5px] leading-relaxed text-pretty text-brand-text/80 sm:text-[16px]">
-            Reels, routines and real reviews from our Luftansa family.
-          </p>
-        </header>
+      <div className="relative mx-auto max-w-[1440px] px-4 pt-16 pb-16 sm:px-10 sm:pt-24 sm:pb-24">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <header>
+            <InstagramGlyph className="mx-auto size-9 sm:size-10" />
+            <div className="mt-3 flex items-center justify-center gap-4 sm:gap-6">
+              <span aria-hidden="true" className="h-px w-12 bg-gradient-to-r from-transparent to-brand-gold/80 min-[400px]:w-20 sm:w-40" />
+              <p className="text-[11px] font-semibold tracking-[0.34em] whitespace-nowrap text-brand-black uppercase sm:text-[12px]">On Instagram</p>
+              <span aria-hidden="true" className="h-px w-12 bg-gradient-to-l from-transparent to-brand-gold/80 min-[400px]:w-20 sm:w-40" />
+            </div>
+            <h2
+              id="reels-heading"
+              className="mt-2 font-serif text-[34px] leading-[1.08] font-semibold tracking-[-0.01em] text-balance text-brand-black italic min-[400px]:text-[38px] sm:text-[46px] lg:text-[54px]"
+            >
+              {view.heading}
+            </h2>
+            {view.subtitle ? (
+              <p className="mx-auto mt-3 max-w-xl text-[14.5px] leading-relaxed text-pretty text-brand-text/80 sm:text-[16px]">{view.subtitle}</p>
+            ) : null}
+          </header>
+        </Reveal>
 
-        <div className="mt-10 sm:mt-12">
-          <ReelsCarousel reels={items} />
-          {isPlaceholder ? (
-            <p className="mt-4 text-center text-[12.5px] tracking-[0.04em] text-brand-text/60">
-              New Luftansa Reels are coming soon.
-            </p>
-          ) : null}
+        <div className="mt-10 sm:mt-14">
+          <ReelsCarousel reels={view.reels} />
         </div>
 
-        {INSTAGRAM_PROFILE_URL ? (
-          <div className="mt-10 flex justify-center sm:mt-12">
+        {view.instagramProfileUrl ? (
+          <Reveal className="mt-10 flex justify-center sm:mt-12">
             <a
-              href={INSTAGRAM_PROFILE_URL}
+              href={view.instagramProfileUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-12 items-center gap-3 rounded-full bg-brand-black px-7 text-[14.5px] font-medium text-white ring-2 ring-brand-gold/70 transition-colors hover:bg-brand-text focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-gold"
+              data-reels-profile
             >
               <InstagramGlyph mono className="size-5" />
               Explore More on Instagram
               <span className="sr-only">(opens in a new tab)</span>
             </a>
-          </div>
+          </Reveal>
         ) : null}
       </div>
     </section>
