@@ -203,7 +203,8 @@ export const variantInputSchema = z.object({
   label: z.string().max(64).optional(),
   sizeMl: z.number().optional(), // Legacy input compatibility
   priceInr: z.number().int().min(1).max(10000000).optional(),
-  mrpInr: z.number().int().min(1).max(10000000).optional(),
+  /** Original price (MRP). null clears it; omitted keeps the existing value. */
+  mrpInr: z.number().int().min(1).max(10000000).nullable().optional(),
   /** null clears the value ("Not set"); omitted keeps the existing value. */
   stockQuantity: z.number().int().min(0).max(1000000).nullable().optional(),
   /** null clears the SKU; omitted keeps the existing value. */

@@ -33,6 +33,7 @@ import type {
 } from "@/lib/db/schemas";
 import { MAX_NOTES_PER_GROUP } from "@/lib/db/schemas";
 import { DEFAULT_ROLL_ON_SIZE_ML, FORMAT_LABEL, PERFUME_TYPE_ID, perfumesWithRollOnSizes, productFormat, productIdFor, ROLL_ON_TYPE_ID, SECTION_LABEL, type ProductFormat } from "@/lib/catalogue/product-format";
+import { cardPrice } from "@/lib/cms/modules/home-collections";
 import { compressImageForUpload } from "@/lib/media/compress-image";
 import { formatMegabytes, isAllowedImageType, MAX_SOURCE_BYTES } from "@/lib/media/upload-limits";
 
@@ -48,7 +49,8 @@ interface VariantFormRow {
   unit: VariantUnit;
   label: string;
   priceInr: number;
-  mrpInr?: number;
+  /** Original price. Empty (undefined/null) = none. */
+  mrpInr?: number | null;
   /** null = stock not configured ("Not set"); 0 = genuine zero stock. */
   stockQuantity: number | null;
   /** Empty = no SKU assigned ("Not set"). SKUs are never auto-generated. */
@@ -86,6 +88,17 @@ function standardPrice(capacity: number, unit: VariantUnit): number | undefined 
   return unit === "ml" ? STANDARD_PRICES[capacity] : undefined;
 }
 
+/** What the storefront will show for this size: the discount, or why there is none. */
+function MrpHint({ priceInr, mrpInr }: { priceInr: number; mrpInr?: number | null }) {
+  if (!mrpInr) return null;
+  if (!(priceInr > 0)) return null;
+  if (mrpInr <= priceInr) {
+    return <p className="mt-0.5 text-[10px] leading-tight text-[#9a3b2b]">Not shown: must be higher than the price</p>;
+  }
+  const { discountPercent } = cardPrice({ priceInr, mrpInr });
+  return <p className="mt-0.5 text-[10px] leading-tight text-[#5f7a3a]">{discountPercent ? `Shown as ${discountPercent}% OFF` : "Shown crossed out (under 1% off)"}</p>;
+}
+
 function toVariantRows(variants: ProductVariantItem[]): VariantFormRow[] {
   return variants
     .filter((v) => v.status !== "ARCHIVED")
@@ -96,7 +109,7 @@ function toVariantRows(variants: ProductVariantItem[]): VariantFormRow[] {
       unit: (v.unit as VariantUnit) || "ml",
       label: v.label || `${v.capacity ?? v.sizeMl} ${v.unit || "ml"}`,
       priceInr: v.priceInr,
-      mrpInr: v.mrpInr,
+      mrpInr: v.mrpInr ?? undefined,
       stockQuantity: v.stockQuantity ?? null,
       sku: v.sku ?? "",
       status: (v.status === "ACTIVE" ? "ACTIVE" : "INACTIVE") as "ACTIVE" | "INACTIVE",
@@ -667,6 +680,12 @@ export function ProductManager({
       setSubmitting(false);
       return;
     }
+    const badMrp = variantsList.find((v) => v.mrpInr !== undefined && v.mrpInr !== null && (!Number.isInteger(Number(v.mrpInr)) || Number(v.mrpInr) < 1));
+    if (badMrp) {
+      setErrorMessage(`The original price of the ${badMrp.label || `${badMrp.capacity} ${badMrp.unit}`} variant must be a whole number of rupees, or left empty.`);
+      setSubmitting(false);
+      return;
+    }
     const displayOrderValue = formDisplayOrder.trim() === "" ? null : Number(formDisplayOrder);
     if (displayOrderValue !== null && (!Number.isInteger(displayOrderValue) || displayOrderValue < 0)) {
       setErrorMessage("Display order must be a whole number (0 or more), or left empty.");
@@ -681,7 +700,7 @@ export function ProductManager({
       unit: v.unit,
       label: v.label || `${v.capacity} ${v.unit}`,
       priceInr: Number(v.priceInr),
-      mrpInr: v.mrpInr ? Number(v.mrpInr) : undefined,
+      mrpInr: v.mrpInr ? Number(v.mrpInr) : isCreate ? undefined : null,
       // Unset values: omitted on create, explicitly cleared (null) on update.
       stockQuantity: v.stockQuantity === null ? (isCreate ? undefined : null) : Math.max(0, Math.trunc(v.stockQuantity)),
       sku: v.sku.trim() ? v.sku.trim() : isCreate ? undefined : null,
@@ -1847,7 +1866,7 @@ export function ProductManager({
                       key={variant.id}
                       className="flex flex-col gap-2 rounded-xl border border-[#E8E4DA] bg-[#FFFDF8] p-3 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-5">
+                      <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-6">
                         {/* Capacity */}
                         <div>
                           <label className="text-[10px] uppercase font-bold text-[#78716C]">Capacity / Size</label>
@@ -1888,6 +1907,26 @@ export function ProductManager({
                             onChange={(e) => updateVariantRow(variant.id, "priceInr", e.target.value === "" ? 0 : Number(e.target.value))}
                             className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs font-semibold text-[#8C6D37]"
                           />
+                        </div>
+
+                        {/* Original price (MRP), optional */}
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-[#78716C]" htmlFor={`mrp-${variant.id}`}>
+                            MRP (₹)
+                          </label>
+                          <input
+                            id={`mrp-${variant.id}`}
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={variant.mrpInr ?? ""}
+                            placeholder="Original price"
+                            title="Optional. The original price, shown crossed out with the discount when it is higher than the price."
+                            onChange={(e) => updateVariantRow(variant.id, "mrpInr", e.target.value === "" ? null : Math.max(0, Math.trunc(Number(e.target.value))))}
+                            className="mt-0.5 w-full rounded border border-[#E8E4DA] bg-white px-2 py-1 text-xs text-[#171717] placeholder:italic placeholder:text-[#A8A29E]"
+                            data-field="variant-mrp"
+                          />
+                          <MrpHint priceInr={variant.priceInr} mrpInr={variant.mrpInr} />
                         </div>
 
                         {/* Stock */}
@@ -2089,6 +2128,7 @@ function VariantSummary({ variants }: { variants?: ProductVariantItem[] }) {
           title={`${v.status === "ACTIVE" ? "Active" : "Inactive"} · Stock: ${v.stockQuantity ?? "Not set"} · SKU: ${v.sku ?? "Not set"}`}
         >
           {v.label ?? `${v.capacity ?? v.sizeMl} ${v.unit ?? "ml"}`}: ₹{v.priceInr.toLocaleString("en-IN")}
+          {v.mrpInr && v.mrpInr > v.priceInr ? <s className="ml-1 text-[10px] text-[#78716C]">₹{v.mrpInr.toLocaleString("en-IN")}</s> : null}
           <span className="ml-1 font-sans text-[10px] text-[#78716C]">
             {v.stockQuantity === undefined ? "· stock not set" : `· ${v.stockQuantity} in stock`}
           </span>

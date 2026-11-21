@@ -237,4 +237,57 @@ await (async () => {
   console.log("   ✓ default until published, drafts private, one record, validation, version check, publish, deactivate, badge flags");
 })();
 
+console.log("8. Original price (MRP) per size, and notes, from the product record...");
+await (async () => {
+  const repo = new Repository(new InMemoryDynamoClient() as unknown as DynamoDBDocumentClient, "luftansa-test");
+  const audit = new AuditService(repo);
+  const actor = "admin@luftansa.local";
+  const N = (t: string, h: string, b: string) => ({ top: [{ id: t.toLowerCase(), name: t }], heart: [{ id: h.toLowerCase(), name: h }], base: [{ id: b.toLowerCase(), name: b }] });
+  await createProduct(repo, audit, actor, {
+    id: "mrp-test",
+    name: "Mrp Test",
+    notes: N("Citrus", "Musk", "Amber"),
+    variants: [
+      { id: "v30", capacity: 30, unit: "ml", priceInr: 400, mrpInr: 500 },
+      { id: "v50", capacity: 50, unit: "ml", priceInr: 630 },
+      { id: "v100", capacity: 100, unit: "ml", priceInr: 1299, mrpInr: 1800 },
+    ],
+  });
+  const card = async (size: "largest" | "smallest" = "largest") => {
+    const p = (await getProductWithVariants(repo, "mrp-test"))!;
+    const sf = mapProductToStorefront(p.product, p.variants);
+    return { p, c: toCollectionCard(sf, { ...D.personality, cardSize: size }, href) };
+  };
+  let { p, c } = await card();
+  assert.deepEqual([c.title, c.notes, c.price], ["Mrp Test – 100 ml", ["Citrus", "Musk", "Amber"], { selling: 1299, original: 1800, discountPercent: 27 }]);
+  assert.deepEqual((await card("smallest")).c.price, { selling: 400, original: 500, discountPercent: 20 }, "each size has its own original price");
+  const vs = (patch: Record<string, Record<string, unknown>>) =>
+    p.variants.map((v) => ({ id: v.id, capacity: v.capacity, unit: v.unit, label: v.label, status: v.status, sortOrder: v.sortOrder, ...(patch[v.id!] ?? {}) }));
+
+  // Omitted MRP keeps the saved value (e.g. the Excel import or an older form).
+  await updateProduct(repo, audit, actor, "mrp-test", { version: p.product.version, variants: vs({}) });
+  ({ p, c } = await card());
+  assert.equal(c.price?.original, 1800, "omitted: kept");
+  // MRP lower than the selling price: no strike-through, no discount.
+  await updateProduct(repo, audit, actor, "mrp-test", { version: p.product.version, variants: vs({ v100: { mrpInr: 1000 } }) });
+  ({ p, c } = await card());
+  assert.deepEqual(c.price, { selling: 1299 }, "MRP below price: price only");
+  // Cleared in Admin (empty field sends null).
+  await updateProduct(repo, audit, actor, "mrp-test", { version: p.product.version, variants: vs({ v100: { mrpInr: null } }) });
+  ({ p, c } = await card());
+  assert.equal(p.variants.find((v) => v.id === "v100")?.mrpInr, undefined, "cleared");
+  assert.deepEqual(c.price, { selling: 1299 }, "no MRP: price only");
+  // Roll-On: 3 notes, ₹449 / ₹599 → 25% OFF.
+  await createProduct(repo, audit, actor, { id: "trails-roll-on", name: "Trails", productTypeId: "roll-on", notes: N("Aquatic", "Fresh", "Woody"), variants: [{ capacity: 10, unit: "ml", priceInr: 449, mrpInr: 599 }] });
+  const ro = (await getProductWithVariants(repo, "trails-roll-on"))!;
+  const rc = toCollectionCard(mapProductToStorefront(ro.product, ro.variants), D.rollOn, href);
+  assert.deepEqual([rc.title, rc.notes, rc.price], ["Trails Roll-On", ["Aquatic", "Fresh", "Woody"], { selling: 449, original: 599, discountPercent: 25 }]);
+  // No notes: the line is left out.
+  await updateProduct(repo, audit, actor, "mrp-test", { version: p.product.version, notes: { top: [], heart: [], base: [] } });
+  assert.deepEqual((await card()).c.notes, [], "no notes: hidden");
+  // Zero is not a valid original price.
+  await assert.rejects(() => updateProduct(repo, audit, actor, "mrp-test", { version: p.product.version + 1, variants: vs({ v100: { mrpInr: 0 } }) }));
+  console.log("   ✓ per-size MRP, 27%/25% OFF, kept when omitted, below-price ignored, cleared, zero refused, notes shown/hidden");
+})();
+
 console.log("--- Homepage Collections tests passed ---");
