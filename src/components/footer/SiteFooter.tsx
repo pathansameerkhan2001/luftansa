@@ -52,9 +52,9 @@ interface FooterLink {
 }
 
 const EXPLORE: FooterLink[] = [
-  { label: "Perfumes", href: "/#personality-collection-heading" },
+  { label: "Perfumes", href: "/perfumes" },
   { label: "Attar" },
-  { label: "Roll On", href: "/#roll-on-collection-heading" },
+  { label: "Roll-On", href: "/roll-on" },
   { label: "Personality Collection", href: "/#personality-collection-heading" },
   { label: "Explore by Notes", href: "/#explore-notes-heading" },
   { label: "Best Sellers", href: "/#best-sellers-heading" },

@@ -32,7 +32,7 @@ export const FAQS: readonly Faq[] = [
     id: "types",
     question: "What types of fragrances does Luftansa offer?",
     answer:
-      "Our current range is perfume sprays, including our Personality Collection and Best Sellers such as Daily Rizz, Nonchalant, Green Flag Energy, Main Character and Deja Vu. Roll-on fragrances are coming soon. For other formats, please contact us.",
+      "Our range includes perfume sprays, including our Personality Collection and Best Sellers such as Daily Rizz, Nonchalant, Green Flag Energy, Main Character and Deja Vu. Many of our fragrances are also available as 8 ml roll-ons in our Roll-On section. For other formats, please contact us.",
   },
   {
     id: "choose",

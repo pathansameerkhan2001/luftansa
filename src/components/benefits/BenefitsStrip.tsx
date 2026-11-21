@@ -30,7 +30,7 @@ export interface Benefit {
 }
 
 export const DEFAULT_BENEFITS: readonly Benefit[] = [
-  { Icon: PerfumeBottleIcon, title: "41 Signature Scents", description: "A diverse range of fine fragrances" },
+  { Icon: PerfumeBottleIcon, title: "Signature Scents", description: "A diverse range of fine fragrances" },
   { Icon: Clock, title: "Long Lasting", description: "All-day performance" },
   { Icon: Gem, title: "Premium Quality", description: "Expertly crafted blends" },
   { Icon: Gift, title: "Perfect for Gifting", description: "Elegant and luxury packaging" },

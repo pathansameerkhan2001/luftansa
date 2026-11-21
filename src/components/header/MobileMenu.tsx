@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Heart, Menu, User, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { PRIMARY_NAV, UTILITY_LINKS, isActivePath } from "./nav-config";
+import { PRIMARY_NAV, SHOW_WISHLIST_ICON, UTILITY_LINKS, isActivePath } from "./nav-config";
 
 export function MobileMenu() {
   const pathname = usePathname();
@@ -121,7 +121,7 @@ export function MobileMenu() {
         <div className="flex flex-col gap-1 border-t border-brand-gold/25 bg-brand-cream px-5 py-4">
           {[
             { ...UTILITY_LINKS.account, Icon: User },
-            { ...UTILITY_LINKS.wishlist, Icon: Heart },
+            ...(SHOW_WISHLIST_ICON ? [{ ...UTILITY_LINKS.wishlist, Icon: Heart }] : []),
           ].map(({ label, href, Icon }) => (
             <Link
               key={href}

@@ -10,6 +10,7 @@ import { ProductPurchase } from "@/components/product/ProductPurchase";
 import { RelatedFragrances } from "@/components/product/RelatedFragrances";
 import type { ProductDetailData } from "@/components/product/types";
 import { STORE_NAME } from "@/data/store";
+import { FORMAT_LABEL, SECTION_LABEL, SECTION_ROUTE } from "@/lib/catalogue/product-format";
 import { selectRelated } from "@/lib/storefront/collections";
 import { productJsonLd, productMetaDescription } from "@/lib/storefront/product-seo";
 import {
@@ -36,8 +37,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const product = await getProduct(slug);
   if (!product) return { title: `Fragrance not found | ${STORE_NAME}`, robots: { index: false } };
-  const title = `${product.name} | ${STORE_NAME}`;
-  const description = productMetaDescription(product);
+  const title = `${product.displayName} | ${STORE_NAME}`;
+  const description = productMetaDescription({ ...product, name: product.displayName, category: product.format === "other" ? product.category : FORMAT_LABEL[product.format] });
   const ogImage = product.mainImage?.src.startsWith("http") ? product.mainImage : undefined;
   return {
     title,
@@ -61,8 +62,10 @@ function toDetailData(product: UnifiedStorefrontProduct): ProductDetailData {
 
   return {
     slug: product.slug,
-    name: product.name,
-    category: product.category,
+    // "Black Velvet Roll-On": used for the heading, image alt text and the WhatsApp order.
+    name: product.displayName,
+    // The product page eyebrow and breadcrumb show the section format (Perfume / Roll-On).
+    category: product.format === "other" ? product.category : FORMAT_LABEL[product.format],
     description: product.description,
     concentration: product.concentration,
     gender: product.gender,
@@ -85,11 +88,15 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   if (!product) notFound();
 
   const data = toDetailData(product);
-  const related = selectRelated(await getActiveStorefrontProducts(), product, 4).map(toStorefrontCardData);
+  // Related products stay within the same section (Perfumes with Perfumes, Roll-Ons with Roll-Ons).
+  const sameSection = (await getActiveStorefrontProducts()).filter((p) => p.format === product.format);
+  const related = selectRelated(sameSection, product, 4).map(toStorefrontCardData);
+  const section = product.format === "other" ? null : product.format;
+  const seoProduct = { ...product, name: product.displayName, category: data.category };
 
   return (
     <main className="bg-brand-ivory">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productJsonLd(product, data.images) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productJsonLd(seoProduct, data.images) }} />
 
       <div className="mx-auto max-w-[1320px] px-4 pt-5 pb-14 sm:px-8 sm:pt-8 sm:pb-20">
         <nav aria-label="Breadcrumb" className="text-[12.5px] text-brand-text/65">
@@ -100,7 +107,15 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li>{data.category}</li>
+            <li>
+              {section ? (
+                <Link href={SECTION_ROUTE[section]} className="hover:text-brand-black hover:underline">
+                  {SECTION_LABEL[section]}
+                </Link>
+              ) : (
+                data.category
+              )}
+            </li>
             <li aria-hidden="true">/</li>
             <li aria-current="page" className="text-brand-black">
               {data.name}

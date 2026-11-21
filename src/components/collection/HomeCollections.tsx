@@ -1,16 +1,10 @@
 import { getAssetUrl } from "@/lib/assets";
 import { productHref } from "@/lib/routes";
-import {
-  ROLL_ON_PRODUCTS,
-  rollOnOptions,
-  sprayOptions,
-  type Product,
-  type RollOnProduct,
-} from "@/data/products";
-import { selectPersonality } from "@/lib/storefront/collections";
+import { sprayOptions, type Product } from "@/data/products";
+import { bySection, SECTION_ROUTE } from "@/lib/catalogue/product-format";
+import { selectPersonality, sortByDisplayOrder } from "@/lib/storefront/collections";
 import { getActiveStorefrontProducts, toStorefrontCardData } from "@/lib/storefront/products";
 import { CollectionPanel } from "./CollectionPanel";
-import { RollOnBottleIcon } from "./icons";
 import type { ProductCardData } from "./ProductCard";
 
 /** Spray perfumes: confirmed sizes priced from the standard price list (+ configured MRP/offers). */
@@ -26,58 +20,38 @@ export function toSprayCardData(product: Product): ProductCardData {
   };
 }
 
-/** Roll-ons: each variant carries its own confirmed price (never the spray price list). */
-function toRollOnCardData(product: RollOnProduct): ProductCardData {
-  const { slug, name, image } = product;
-  return {
-    slug,
-    name,
-    options: rollOnOptions(product),
-    image: image ? { src: getAssetUrl(image.key), alt: image.alt, objectPosition: image.objectPosition } : undefined,
-  };
-}
-
-function RollOnComingSoon() {
-  return (
-    <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-[22px] bg-[radial-gradient(110%_80%_at_50%_30%,var(--brand-ivory)_0%,var(--brand-cream)_75%)] px-6 py-14 text-center ring-1 ring-brand-gold/20">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-3 rounded-2xl border border-brand-gold/25" />
-      <RollOnBottleIcon aria-hidden="true" className="size-16 text-brand-gold/60" strokeWidth={0.75} />
-      <p className="mt-5 text-[11px] font-medium tracking-[0.32em] text-brand-black uppercase sm:text-[12px]">
-        Coming soon
-      </p>
-      <p className="mt-2 max-w-xs font-serif text-[17px] leading-snug text-brand-text/80">
-        Our roll-on fragrances will be available here shortly.
-      </p>
-    </div>
-  );
-}
-
-/** Homepage collections: Personality and Roll On panels (side by side from xl). */
+/**
+ * Homepage collections: Personality (Perfumes only) and Roll On (Roll-On
+ * products only), side by side from xl. The Roll On panel is left out while
+ * no Roll-On product is active, so the Perfumes panel then spans the row.
+ */
 export async function HomeCollections() {
-  const allActive = await getActiveStorefrontProducts();
+  const sections = bySection(await getActiveStorefrontProducts());
 
-  // "personality" members first, then every other active product (existing homepage behaviour).
-  const personality = selectPersonality(allActive).map(toStorefrontCardData);
-
-  const rollOns = ROLL_ON_PRODUCTS.map(toRollOnCardData);
+  // "personality" members first, then every other active Perfume (existing homepage behaviour).
+  const personality = selectPersonality(sections.perfume).map(toStorefrontCardData);
+  const rollOns = sortByDisplayOrder(sections["roll-on"]).map(toStorefrontCardData);
 
   return (
     <div className="bg-brand-cream">
-      <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-10 px-4 pt-12 pb-14 sm:px-8 sm:pt-16 sm:pb-20 xl:grid-cols-2 xl:gap-8 2xl:gap-10">
+      <div className={`mx-auto grid max-w-[1600px] grid-cols-1 gap-10 px-4 pt-12 pb-14 sm:px-8 sm:pt-16 sm:pb-20 xl:gap-8 2xl:gap-10 ${rollOns.length ? "xl:grid-cols-2" : ""}`}>
         <CollectionPanel
           id="personality-collection"
           title="Personality Collection"
           subtitle="Distinctive fragrances that reflect your unique style."
           products={personality}
+          viewAll={{ href: SECTION_ROUTE.perfume, label: "View all perfumes" }}
         />
-        <CollectionPanel
-          id="roll-on-collection"
-          title="Roll On Collection"
-          subtitle="Discover your favourite fragrances in a convenient roll-on format."
-          products={rollOns}
-          placeholder="roll-on"
-          emptyState={<RollOnComingSoon />}
-        />
+        {rollOns.length ? (
+          <CollectionPanel
+            id="roll-on-collection"
+            title="Roll On Collection"
+            subtitle="Discover your favourite fragrances in a convenient roll-on format."
+            products={rollOns}
+            placeholder="roll-on"
+            viewAll={{ href: SECTION_ROUTE["roll-on"], label: "View all roll-ons" }}
+          />
+        ) : null}
       </div>
     </div>
   );

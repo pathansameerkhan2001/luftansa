@@ -16,6 +16,8 @@ export interface ProductCardData {
   href?: string;
   options: readonly ProductOption[];
   image?: { src: string; alt: string; objectPosition?: string };
+  /** Placeholder icon for this product (a Roll-On shows a roll-on bottle). The card prop overrides it. */
+  placeholder?: PlaceholderKind;
 }
 
 interface ProductCardProps {
@@ -33,13 +35,13 @@ interface ProductCardProps {
  */
 export function ProductCard({
   product,
-  placeholder = "spray",
+  placeholder,
   imageSizes = "(min-width: 1280px) 22vw, (min-width: 640px) 45vw, 85vw",
 }: ProductCardProps) {
   const { name, description, href, options, image } = product;
   const fromPrice = startingPrice(options);
   const isRange = hasPriceRange(options);
-  const PlaceholderIcon = placeholder === "roll-on" ? RollOnBottleIcon : PerfumeBottleIcon;
+  const PlaceholderIcon = (placeholder ?? product.placeholder) === "roll-on" ? RollOnBottleIcon : PerfumeBottleIcon;
 
   return (
     <article

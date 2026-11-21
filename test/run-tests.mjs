@@ -44,3 +44,6 @@ await jiti.import("./preview-isolation.test.ts");
 
 console.log("\nLoading excel-import.test.ts via jiti...");
 await jiti.import("./excel-import.test.ts");
+
+console.log("\nLoading product-sections.test.ts via jiti...");
+await jiti.import("./product-sections.test.ts");

@@ -3,13 +3,18 @@ export interface NavItem {
   href: string;
 }
 
-/** Primary navigation. Single source of truth for desktop + mobile menus. */
+/**
+ * Primary navigation. Single source of truth for desktop + mobile menus.
+ * Only destinations that exist: "Our Story" opens the brand story on the
+ * homepage and "Contact Us" the contact details in the footer (on every page)
+ * until dedicated /our-story and /contact pages are built.
+ */
 export const PRIMARY_NAV: readonly NavItem[] = [
   { label: "Home", href: "/" },
-  { label: "Shop All", href: "/shop" },
-  { label: "Collection", href: "/collections" },
-  { label: "Our Story", href: "/our-story" },
-  { label: "Contact Us", href: "/contact" },
+  { label: "Perfumes", href: "/perfumes" },
+  { label: "Roll-On", href: "/roll-on" },
+  { label: "Our Story", href: "/#brand-story-heading" },
+  { label: "Contact Us", href: "#footer-contact" },
 ];
 
 /**
@@ -18,6 +23,9 @@ export const PRIMARY_NAV: readonly NavItem[] = [
  * only once /cart is a working page.
  */
 export const SHOW_CART_ICON = false;
+
+/** The wishlist icon stays hidden until /wishlist is a working page (it would otherwise lead to a missing page). */
+export const SHOW_WISHLIST_ICON = false;
 
 export const UTILITY_LINKS = {
   search: { label: "Search", href: "/search" },
