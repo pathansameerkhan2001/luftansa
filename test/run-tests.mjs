@@ -32,3 +32,9 @@ await jiti.import("./product-experience.test.ts");
 
 console.log("\nLoading cms-foundation.test.ts via jiti...");
 await jiti.import("./cms-foundation.test.ts");
+
+console.log("\nLoading homepage-cms.test.ts via jiti...");
+await jiti.import("./homepage-cms.test.ts");
+
+console.log("\nLoading announcement-bar.test.ts via jiti...");
+await jiti.import("./announcement-bar.test.ts");

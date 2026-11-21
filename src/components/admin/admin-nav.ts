@@ -3,7 +3,9 @@ import {
   FileText,
   ImageIcon,
   LayoutDashboard,
+  Megaphone,
   Package,
+  PanelTop,
   Settings,
   ShoppingCart,
   Tag,
@@ -25,15 +27,18 @@ export interface AdminNavGroup {
 
 const DASHBOARD: AdminNavItem = { label: "Dashboard", href: "/admin", Icon: LayoutDashboard, description: "Store overview and recent activity." };
 const PRODUCTS: AdminNavItem = { label: "Products", href: "/admin/products", Icon: Package, description: "Fragrances, sizes, prices, images and SEO." };
+const HERO: AdminNavItem = { label: "Hero Section", href: "/admin/hero", Icon: PanelTop, description: "Homepage hero images, videos, heading and button." };
+const ANNOUNCEMENT: AdminNavItem = { label: "Announcement Bar", href: "/admin/announcement-bar", Icon: Megaphone, description: "Messages in the bar above the header: order, schedule and display." };
 const MEDIA: AdminNavItem = { label: "Media Library", href: "/admin/media", Icon: ImageIcon, description: "Images and videos, usage and safe deletion." };
 
 /**
  * Sidebar navigation, grouped. Only modules that genuinely work are listed
- * (no non-functional entries). Website Management modules are added from
- * Phase 3B as each one is built.
+ * (no non-functional entries). Website pages are added in Phase 3B as each
+ * one is built (docs/phase-3b-plan.md).
  */
 export const ADMIN_NAV_GROUPS: readonly AdminNavGroup[] = [
   { label: "Store Management", items: [DASHBOARD, PRODUCTS] },
+  { label: "Website", items: [HERO, ANNOUNCEMENT] },
   { label: "Media", items: [MEDIA] },
 ];
 

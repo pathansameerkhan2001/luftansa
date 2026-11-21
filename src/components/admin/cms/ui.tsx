@@ -12,6 +12,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 export const ADMIN_FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold";
 export const BTN_PRIMARY = `inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand-black px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-brand-text disabled:cursor-not-allowed disabled:opacity-50 ${ADMIN_FOCUS}`;
 export const BTN_SECONDARY = `inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#d9c79f] bg-white px-4 text-[13.5px] font-medium text-brand-black transition-colors hover:border-brand-black disabled:cursor-not-allowed disabled:opacity-50 ${ADMIN_FOCUS}`;
+/** Square 40px icon-only button (secondary style). Never combine BTN_SECONDARY with px-0: its px-4 wins and squashes the icon. */
+export const BTN_ICON = BTN_SECONDARY.replace(" px-4 ", " w-10 shrink-0 px-0 ");
 export const BTN_DANGER = `inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#9a3b2b] px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-[#7f2f22] disabled:cursor-not-allowed disabled:opacity-50 ${ADMIN_FOCUS}`;
 export const INPUT = `w-full rounded-xl border border-[#d9c79f] bg-white px-3 py-2 text-[14px] text-brand-black placeholder:text-brand-text/40 ${ADMIN_FOCUS}`;
 
