@@ -42,6 +42,9 @@ export interface UnifiedStorefrontProduct {
   };
   featured: boolean;
   bestseller: boolean;
+  /** Promotional card badges (Admin → Products). */
+  newLaunch: boolean;
+  buyOneGetOne: boolean;
   /** Homepage collections this product is placed in ("signature", "personality"). */
   collections: readonly string[];
   displayOrder?: number;
@@ -129,6 +132,8 @@ export function mapProductToStorefront(
     notes: { top, heart, base },
     featured: product.featured ?? false,
     bestseller: product.bestseller ?? false,
+    newLaunch: product.newLaunch ?? false,
+    buyOneGetOne: product.buyOneGetOne ?? false,
     collections: product.collections ?? [],
     displayOrder: product.displayOrder,
     concentration: product.concentration,
