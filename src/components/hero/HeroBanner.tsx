@@ -31,15 +31,85 @@ function HeroImage({ src, alt, position, hideOn, priority }: { src: string; alt:
 }
 
 /**
+ * Space reserved for a fitted hero image until it loads. Only the ratio
+ * matters: once loaded, the box follows the image's own aspect ratio
+ * (`height: auto`). Desktop banners are typically 16:9; phone banners portrait.
+ */
+const RESERVE_WIDER = { width: 1600, height: 900 };
+const RESERVE_PHONE = { width: 1080, height: 1350 };
+
+/**
+ * Image-only hero: the whole banner is always visible, never cropped or
+ * stretched. The box takes the image's natural aspect ratio. On large
+ * screens the height is capped so the hero never dominates the page; the
+ * image is then scaled down (object-contain, centred) and a blurred copy of
+ * itself fills the sides instead of empty bars.
+ */
+function FittedHeroImage({ src, alt, hideOn, priority }: { src: string; alt: string; hideOn?: "phone" | "wider"; priority: boolean }) {
+  const reserve = hideOn === "wider" ? RESERVE_PHONE : RESERVE_WIDER;
+  const { props } = getImageProps({ src, alt, ...reserve, sizes: "100vw", quality: 80, priority });
+  const img = (
+    // eslint-disable-next-line @next/next/no-img-element -- art-directed <picture> needs a plain <img> (props come from next/image getImageProps)
+    <img {...props} alt={alt} className="relative block h-auto w-full object-contain object-center lg:max-h-[min(80vh,860px)]" />
+  );
+  if (!hideOn) return img;
+  return (
+    <picture className={hideOn === "phone" ? "hidden sm:contents" : "contents sm:hidden"}>
+      <source media={hideOn === "phone" ? PHONE : WIDER} srcSet={BLANK} />
+      {img}
+    </picture>
+  );
+}
+
+/** Soft blurred fill behind a height-capped desktop banner (decorative; tiny, lazily loaded, never on phones). */
+function HeroBackdrop({ src }: { src: string }) {
+  const { props } = getImageProps({ src, alt: "", width: 96, height: 54, quality: 50 });
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- decorative backdrop built from next/image getImageProps
+    <img
+      {...props}
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      className="pointer-events-none absolute inset-0 hidden h-full w-full scale-110 object-cover blur-2xl lg:block"
+    />
+  );
+}
+
+/**
  * CMS hero (Server Component): full-width image with optional muted video,
- * heading, subtitle and button. Same box sizes as the original hero at every
- * breakpoint, so the page below never moves.
+ * heading, subtitle and button.
+ *   - Image only (no text): the full banner is shown at its own aspect ratio
+ *     (nothing cropped), see FittedHeroImage.
+ *   - With text: the original fixed boxes with a cover-cropped photo, so the
+ *     overlaid text always has room.
  */
 export function HeroBanner({ view, className = "", priority = true }: { view: HeroView; className?: string; priority?: boolean }) {
   const { desktop, mobile, heading, subtitle, cta } = view;
   const sameImage = desktop.imageSrc === mobile.imageSrc && desktop.alt === mobile.alt;
   const hasText = Boolean(heading || subtitle || cta);
   const internal = cta?.href.startsWith("/");
+
+  if (!hasText) {
+    return (
+      <section aria-label="Luftansa Fragrances" className={`relative w-full bg-brand-cream ${className}`} data-hero="cms">
+        <div className="relative w-full overflow-hidden">
+          <HeroBackdrop src={desktop.imageSrc} />
+          {sameImage ? (
+            <FittedHeroImage src={desktop.imageSrc} alt={desktop.alt} priority={priority} />
+          ) : (
+            <>
+              <FittedHeroImage src={desktop.imageSrc} alt={desktop.alt} hideOn="phone" priority={priority} />
+              <FittedHeroImage src={mobile.imageSrc} alt={mobile.alt} hideOn="wider" priority={priority} />
+            </>
+          )}
+          {desktop.videoSrc || mobile.videoSrc ? (
+            <HeroVideo desktopSrc={desktop.videoSrc} mobileSrc={mobile.videoSrc} desktopPosition={desktop.position} mobilePosition={mobile.position} />
+          ) : null}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section aria-label={heading ? undefined : "Luftansa Fragrances"} aria-labelledby={heading ? "hero-heading" : undefined} className={`relative w-full bg-brand-cream ${className}`} data-hero="cms">
