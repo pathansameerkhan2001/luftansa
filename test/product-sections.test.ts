@@ -160,7 +160,14 @@ console.log("7. Notes: up to 12 per group...");
 console.log("8. Navigation: only pages that exist...");
 {
   assert.deepEqual(PRIMARY_NAV.map((n) => n.label), ["Home", "Perfumes", "Roll-On", "Our Story", "Contact Us"]);
-  assert.ok(!PRIMARY_NAV.some((n) => /^\/(shop|collections|contact)\b/.test(n.href)), "no links to pages that do not exist");
+  // Every link must have a page file (src/app/<path>/page.tsx).
+  const { existsSync } = await import("node:fs");
+  const appDir = new URL("../src/app/", import.meta.url);
+  for (const n of PRIMARY_NAV) {
+    const path = n.href.split(/[?#]/)[0].replace(/^\//, "");
+    assert.ok(existsSync(new URL(path ? `${path}/page.tsx` : "page.tsx", appDir)), `no links to pages that do not exist: ${n.href}`);
+  }
+  assert.equal(PRIMARY_NAV.find((n) => n.label === "Contact Us")?.href, "/contact", "Contact Us opens its page (src/app/contact/page.tsx)");
   assert.equal(PRIMARY_NAV.find((n) => n.label === "Our Story")?.href, "/our-story", "Our Story opens its page (src/app/our-story/page.tsx)");
   assert.equal(SHOW_WISHLIST_ICON, false, "wishlist icon hidden until /wishlist exists");
   console.log("   ✓ Home, Perfumes, Roll-On, Our Story, Contact Us");

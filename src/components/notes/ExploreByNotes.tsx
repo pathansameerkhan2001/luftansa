@@ -60,7 +60,7 @@ function NoteCard({ category }: { category: NoteCategory }) {
             // (never a broken href). Set `href` in note-categories.ts to enable it.
             <span aria-disabled="true" className={`${BUTTON_CLASS} cursor-default`}>
               Explore Collection
-              <span className="sr-only">: {title} (coming soon)</span>
+              <span className="sr-only">: {title}</span>
               <ArrowRight aria-hidden="true" className="size-4" strokeWidth={1.75} />
             </span>
           )}
@@ -71,8 +71,9 @@ function NoteCard({ category }: { category: NoteCategory }) {
 }
 
 /** "Explore by Notes": four fragrance-note category cards (Server Component). */
-export function ExploreByNotes({ categories = NOTE_CATEGORIES }: { categories?: readonly NoteCategory[] }) {
+export function ExploreByNotes({ categories = NOTE_CATEGORIES, headingLevel = "h2" }: { categories?: readonly NoteCategory[]; headingLevel?: "h1" | "h2" }) {
   if (categories.length === 0) return null;
+  const Heading = headingLevel;
 
   return (
     <section aria-labelledby="explore-notes-heading" className="bg-brand-cream">
@@ -86,12 +87,12 @@ export function ExploreByNotes({ categories = NOTE_CATEGORIES }: { categories?: 
           <p className="mt-3 text-[11px] tracking-[0.36em] text-brand-black uppercase sm:text-[12px] sm:tracking-[0.4em]">
             <span className="font-normal">Fragrance</span> <span className="font-semibold">Notes</span>
           </p>
-          <h2
+          <Heading
             id="explore-notes-heading"
             className="mt-1 font-serif text-[38px] leading-[1.05] font-semibold italic tracking-[-0.01em] text-brand-black min-[400px]:text-[42px] sm:text-[54px] lg:text-[62px]"
           >
             Explore by Notes
-          </h2>
+          </Heading>
           <p className="mx-auto mt-3 max-w-xl text-[14.5px] leading-relaxed text-pretty text-brand-text/80 sm:text-[16px]">
             Find your perfect fragrance from our curated note collections.
           </p>

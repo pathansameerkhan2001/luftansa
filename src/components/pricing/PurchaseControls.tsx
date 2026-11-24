@@ -130,7 +130,8 @@ interface PricePanelProps {
   option: ProductOption;
   productName: string;
   wishlisted?: boolean;
-  onWishlist: () => void;
+  /** Wishlist handler. The heart button is only shown when a working wishlist exists (one is passed). */
+  onWishlist?: () => void;
   /** Visual scale: "card" for product cards, "feature" for Best Sellers. */
   size?: "card" | "feature";
 }
@@ -188,6 +189,7 @@ export function PricePanel({ option, productName, wishlisted = false, onWishlist
           </p>
           {feature ? null : <p className="mt-1 text-[11.5px] text-brand-text/60">{option.label}</p>}
         </div>
+        {onWishlist ? (
         <button
           type="button"
           onClick={onWishlist}
@@ -203,6 +205,7 @@ export function PricePanel({ option, productName, wishlisted = false, onWishlist
             strokeWidth={1.5}
           />
         </button>
+        ) : null}
       </div>
     </div>
   );

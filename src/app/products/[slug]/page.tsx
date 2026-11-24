@@ -41,7 +41,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!product) return { title: `Fragrance not found | ${STORE_NAME}`, robots: { index: false } };
   const title = `${product.displayName} | ${STORE_NAME}`;
   const description = productMetaDescription({ ...product, name: product.displayName, category: product.format === "other" ? product.category : FORMAT_LABEL[product.format] });
-  const ogImage = product.mainImage?.src.startsWith("http") ? product.mainImage : undefined;
+  // Relative /media/... URLs are resolved against the site's domain by Next.js.
+  // Without a product photograph the site-wide logo image (src/app/opengraph-image.jpg) is used.
+  const ogImage = product.mainImage;
   return {
     title,
     description,
@@ -50,7 +52,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description,
       type: "website",
       siteName: STORE_NAME,
-      ...(ogImage ? { images: [{ url: ogImage.src, alt: ogImage.alt }] } : {}),
+      // A page-level openGraph replaces the site's, so the logo image is repeated when there is no photo.
+      images: ogImage ? [{ url: ogImage.src, alt: ogImage.alt }] : [{ url: "/opengraph-image.jpg", width: 1200, height: 630, alt: `${STORE_NAME} logo` }],
     },
   };
 }
@@ -129,7 +132,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
         {/* ~55% gallery / ~45% information on desktop; stacked (image first) below lg. */}
         <div className="mt-5 grid grid-cols-1 gap-8 sm:mt-6 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)] lg:gap-12 xl:gap-16">
-          <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+          {/* Stacked (below lg): the gallery is capped at 600px wide and centred, so the
+              order controls stay close on tablets. */}
+          <div className="mx-auto w-full max-w-[600px] min-w-0 lg:sticky lg:top-6 lg:max-w-none lg:self-start">
             <ProductGallery name={data.name} images={data.images} />
           </div>
           <div className="min-w-0">

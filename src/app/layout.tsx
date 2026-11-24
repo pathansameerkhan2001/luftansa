@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import localFont from "next/font/local";
@@ -27,9 +27,26 @@ const cormorant = localFont({
   adjustFontFallback: "Times New Roman",
 });
 
+// Icons, the Apple touch icon and the Open Graph image are file-based
+// (src/app/favicon.ico, icon.png, apple-icon.png, opengraph-image.jpg), all
+// made from the Luftansa hummingbird logo. On Vercel, Next.js resolves their
+// absolute URLs from the production domain automatically.
 export const metadata: Metadata = {
   title: "Luftansa Fragrance Craft Hub",
   description: "Luxury fragrances crafted by Luftansa Fragrance Craft Hub.",
+  applicationName: "Luftansa Fragrance Craft Hub",
+  openGraph: {
+    type: "website",
+    siteName: "Luftansa Fragrance Craft Hub",
+    title: "Luftansa Fragrance Craft Hub",
+    description: "Luxury fragrances crafted by Luftansa Fragrance Craft Hub.",
+    locale: "en_IN",
+  },
+  twitter: { card: "summary_large_image" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#fffdf8",
 };
 
 export default function RootLayout({

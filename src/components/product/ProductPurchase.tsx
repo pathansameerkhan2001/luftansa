@@ -291,7 +291,7 @@ export function ProductPurchase({ product }: { product: ProductDetailData }) {
                   aria-disabled="true"
                   className="inline-flex h-12 min-w-0 flex-1 items-center justify-center rounded-xl border border-brand-gold/50 bg-white px-3 text-[14.5px] font-semibold text-brand-text/55"
                 >
-                  {soldOut ? "Out of stock" : "Online ordering coming soon"}
+                  {soldOut ? "Out of stock" : "Contact us to order"}
                 </span>
               )}
             </div>
@@ -363,7 +363,7 @@ export function ProductPurchase({ product }: { product: ProductDetailData }) {
           ) : null}
         </>
       ) : (
-        <p className="mt-6 text-[13px] text-brand-text/60">Sizes &amp; pricing coming soon</p>
+        <p className="mt-6 text-[13px] text-brand-text/60">Sizes and prices for this fragrance are available from our team on WhatsApp.</p>
       )}
     </div>
   );

@@ -6,9 +6,9 @@ import { ChevronLeft, ChevronRight, MessageCircle, Sparkles } from "lucide-react
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
 import { PricePanel, SizePriceCards } from "@/components/pricing/PurchaseControls";
+import { ProductPhoto } from "@/components/product/ProductPhoto";
 import { formatInr, type ProductOption } from "@/data/products";
-import { BUY_NOW_VIA_WHATSAPP } from "@/data/store";
-import { dispatchWishlist } from "@/lib/cart-events";
+import { BUY_NOW_VIA_WHATSAPP, whatsappHref } from "@/data/store";
 import { whatsAppOrderHref } from "@/lib/storefront/whatsapp-order";
 
 type NoteTier = "top" | "middle" | "base";
@@ -32,6 +32,7 @@ export interface BestSellerItem {
 const TIER_LABEL: Record<NoteTier, string> = { top: "Top Note", middle: "Middle Note", base: "Base Note" };
 const DARK = "bg-[#1c1712]";
 const ACCENT_TEXT = "text-[#7a5a2b]";
+const NOTE_COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" };
 
 /* ---------------------------------------------------------------- bottle --- */
 
@@ -152,6 +153,8 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
   };
 
   // No online cart yet: ordering goes through WhatsApp with the selection prefilled.
+  const knownNotes = item.notes.filter((n): n is typeof n & { name: string } => Boolean(n.name));
+
   const orderHref =
     selected && BUY_NOW_VIA_WHATSAPP
       ? whatsAppOrderHref({
@@ -163,11 +166,6 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
           quantity: 1,
         })
       : undefined;
-
-  const wishlist = () => {
-    dispatchWishlist({ slug: item.slug, name: item.name });
-    setStatus("Wishlist is coming soon.");
-  };
 
   return (
     <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-x-8 md:gap-y-10 lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-8 xl:grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)] xl:gap-x-10">
@@ -201,7 +199,7 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
         aria-label="Best seller showcase"
         className="relative mx-auto w-full max-w-[560px] md:max-w-none"
       >
-        <div className="relative aspect-square overflow-hidden rounded-[24px] bg-brand-cream shadow-[0_24px_48px_-28px_rgba(60,45,20,0.45)] ring-1 ring-brand-gold/25">
+        <div className="relative aspect-square overflow-hidden rounded-[24px] bg-[radial-gradient(110%_80%_at_50%_40%,#ffffff_0%,var(--brand-ivory)_45%,var(--brand-cream)_100%)] shadow-[0_24px_48px_-28px_rgba(60,45,20,0.45)] ring-1 ring-brand-gold/25">
           <div
             key={item.slug}
             aria-roledescription="slide"
@@ -209,26 +207,22 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
             className="absolute inset-0 transition-opacity duration-500 ease-out motion-reduce:transition-none starting:opacity-0"
           >
             {item.image ? (
-              <Image
+              <ProductPhoto
                 src={item.image.src}
                 alt={item.image.alt}
-                fill
                 sizes="(min-width: 1280px) 34vw, (min-width: 768px) 45vw, 92vw"
-                className="object-cover"
-                style={{ objectPosition: item.image.objectPosition ?? "50% 50%" }}
+                preset="showcase"
+                objectPosition={item.image.objectPosition}
               />
             ) : (
               <div className="absolute inset-0 bg-[radial-gradient(90%_75%_at_50%_40%,#fffdf8_0%,#f3ece0_70%,#eadfcd_100%)]">
                 <div aria-hidden="true" className="absolute inset-4 rounded-[18px] border border-brand-gold/30" />
-                <span className="absolute top-7 left-1/2 -translate-x-1/2 rounded-full border border-brand-gold/50 bg-white/70 px-3 py-1 text-[10.5px] font-medium tracking-[0.14em] whitespace-nowrap text-brand-text/70 uppercase">
-                  Temporary placeholder
-                </span>
                 <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
                   <PerfumeBottleIcon aria-hidden="true" className="size-20 text-brand-gold/60 sm:size-24" strokeWidth={0.6} />
                   <p className="mt-4 font-serif text-[23px] leading-tight font-semibold italic text-brand-black sm:text-[26px]">
                     {item.name}
                   </p>
-                  <p className="mt-1 text-[13px] text-brand-text/65">Product photograph coming soon</p>
+                  <p className="mt-1 text-[11px] font-medium tracking-[0.22em] text-brand-text/55 uppercase">Luftansa Fragrance Craft Hub</p>
                 </div>
               </div>
             )}
@@ -299,22 +293,22 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
             <span className="sr-only">: {item.name}</span>
           </Link>
         ) : null}
-        <p className={`mt-3 text-[14.5px] font-semibold ${ACCENT_TEXT} sm:text-[15px]`}>
-          Perfect for:{" "}
-          {item.perfectFor ?? <span className="font-normal text-brand-text/55 italic">details coming soon</span>}
-        </p>
-        <p className="mt-1.5 text-[14px] leading-relaxed text-pretty text-brand-text/85 sm:text-[14.5px]">
-          {item.description ?? (
-            <span className="text-brand-text/55 italic">
-              Fragrance description coming soon. Notes and occasion will appear here once confirmed.
-            </span>
-          )}
-        </p>
+        {/* Only confirmed details are shown; anything not set is simply left out. */}
+        {item.perfectFor ? (
+          <p className={`mt-3 text-[14.5px] font-semibold ${ACCENT_TEXT} sm:text-[15px]`}>
+            Perfect for: <span className="font-normal text-brand-text/85">{item.perfectFor}</span>
+          </p>
+        ) : null}
+        {item.description ? (
+          <p className="mt-1.5 text-[14px] leading-relaxed text-pretty text-brand-text/85 sm:text-[14.5px]">{item.description}</p>
+        ) : null}
 
+        {knownNotes.length ? (
+          <>
         <hr className="my-4 border-brand-gold/30" />
 
-        <ul className="grid grid-cols-3 divide-x divide-brand-gold/30" aria-label="Scent notes">
-          {item.notes.map((note) => (
+        <ul className={`grid divide-x divide-brand-gold/30 ${NOTE_COLS[knownNotes.length] ?? "grid-cols-3"}`} aria-label="Scent notes">
+          {knownNotes.map((note) => (
             <li key={note.tier} className="flex flex-col items-center px-1 text-center">
               <span className="relative inline-flex size-12 items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_6px_14px_-8px_rgba(60,45,20,0.5)] ring-1 ring-brand-gold/30 sm:size-14">
                 {note.image ? (
@@ -324,12 +318,12 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
                 )}
               </span>
               <span className="mt-2 text-[11.5px] text-brand-text/70 sm:text-[12px]">{TIER_LABEL[note.tier]}</span>
-              <span className="mt-0.5 text-[14px] font-semibold text-brand-black sm:text-[14.5px]">
-                {note.name ?? <span className="text-[12px] font-normal text-brand-text/50 italic">Coming soon</span>}
-              </span>
+              <span className="mt-0.5 text-[14px] font-semibold text-brand-black sm:text-[14.5px]">{note.name}</span>
             </li>
           ))}
         </ul>
+          </>
+        ) : null}
 
         <hr className="my-4 border-brand-gold/30" />
 
@@ -350,7 +344,7 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
 
         {selected ? (
           <div className="mt-4">
-            <PricePanel option={selected} productName={item.name} onWishlist={wishlist} size="feature" />
+            <PricePanel option={selected} productName={item.name} size="feature" />
           </div>
         ) : null}
 
@@ -370,7 +364,15 @@ export function BestSellersShowcase({ items }: { items: readonly BestSellerItem[
               </span>
             </a>
           ) : (
-            <p className="text-center text-[13px] text-brand-text/60">Online ordering is coming soon.</p>
+            <a
+              href={whatsappHref(`Hello Luftansa, I would like to know more about ${item.name}.`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-12 w-full items-center justify-center gap-3 rounded-full border border-brand-black text-[15px] font-semibold text-brand-black transition-colors hover:bg-brand-black hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-gold"
+            >
+              <MessageCircle aria-hidden="true" className="size-5" strokeWidth={1.5} />
+              Ask us on WhatsApp<span className="sr-only">: {item.name} (opens WhatsApp in a new tab)</span>
+            </a>
           )}
         </div>
         <p role="status" className="mt-2 min-h-[1.25rem] text-[12.5px] text-brand-text/70">

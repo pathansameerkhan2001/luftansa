@@ -1,6 +1,9 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+
+/** Cache tag of small catalogue facts shown site-wide (e.g. whether the footer lists Attar). */
+export const CATALOGUE_TAG = "storefront:catalogue";
 
 /**
  * Storefront pages are statically cached (ISR). After any admin catalogue
@@ -16,6 +19,13 @@ export function revalidateStorefront(productId?: string): void {
     // Section listings (Perfumes, Roll-On).
     revalidatePath("/perfumes");
     revalidatePath("/roll-on");
+    // Collection pages built from product data.
+    revalidatePath("/best-sellers");
+    revalidatePath("/collections/personality");
+    revalidatePath("/attar");
+    revalidatePath("/notes/[family]", "page");
+    revalidatePath("/search");
+    revalidateTag(CATALOGUE_TAG);
     if (productId) revalidatePath(`/products/${productId}`);
     // Covers every other product page (e.g. collection membership changes).
     revalidatePath("/products/[slug]", "page");

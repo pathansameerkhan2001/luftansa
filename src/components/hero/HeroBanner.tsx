@@ -136,10 +136,11 @@ export function HeroBanner({ view, className = "", priority = true }: { view: He
             <div className="absolute inset-x-0 bottom-0 z-10 sm:inset-y-0 sm:flex sm:items-center">
               <div className="mx-auto w-full max-w-7xl px-5 pb-7 sm:px-8 sm:pb-0 lg:px-10">
                 <div className="max-w-xl text-white">
+                  {/* h2: the homepage has one stable h1 (src/app/page.tsx); hero slides rotate and may have no heading. */}
                   {heading ? (
-                    <h1 id="hero-heading" className="font-serif text-[30px] leading-[1.06] font-semibold text-balance sm:text-[44px] lg:text-[60px]">
+                    <h2 id="hero-heading" className="font-serif text-[30px] leading-[1.06] font-semibold text-balance sm:text-[44px] lg:text-[60px]">
                       {heading}
-                    </h1>
+                    </h2>
                   ) : null}
                   {subtitle ? <p className="mt-2.5 max-w-md text-[14.5px] leading-relaxed text-white/85 sm:mt-4 sm:text-[17px]">{subtitle}</p> : null}
                   {cta ? (

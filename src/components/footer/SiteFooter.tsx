@@ -6,6 +6,8 @@ import { InstagramGlyph } from "@/components/reels/InstagramGlyph";
 import { CONTACT, mailHref, SOCIAL_LINKS, STORE_NAME, telHref, whatsappHref } from "@/data/store";
 import { BRAND_ASSETS, getAssetUrl } from "@/lib/assets";
 import { ABOUT_ROUTE } from "@/lib/routes";
+import { livePolicyLinks } from "@/lib/storefront/policies";
+import { hasActiveAttar } from "@/lib/storefront/site-links";
 
 /* ------------------------------------------------------------------ logo --- */
 
@@ -47,28 +49,33 @@ function FooterLogo() {
 
 interface FooterLink {
   label: string;
-  /** Unset = the destination does not exist yet (rendered as "coming soon", never a dead link). */
-  href?: string;
+  href: string;
 }
 
-const EXPLORE: FooterLink[] = [
-  { label: "Perfumes", href: "/perfumes" },
-  { label: "Attar" },
-  { label: "Roll-On", href: "/roll-on" },
-  { label: "Personality Collection", href: "/#personality-collection-heading" },
-  { label: "Explore by Notes", href: "/#explore-notes-heading" },
-  { label: "Best Sellers", href: "/#best-sellers-heading" },
-];
-
-const SERVICE: FooterLink[] = [
-  { label: "Contact Us", href: "#footer-contact" },
-  { label: "About Us", href: ABOUT_ROUTE ?? "/#brand-story-heading" },
-  { label: "FAQs", href: "/#faqs" },
-  { label: "Shipping Policy" },
-  { label: "Return Policy" },
-  { label: "Privacy Policy" },
-  { label: "Terms and Conditions" },
-];
+/**
+ * Every footer link leads to a finished page. Links whose page depends on
+ * content are only listed while that page exists: Attar while an Attar product
+ * is active, each policy page while it is not deactivated in Admin.
+ */
+async function footerLinks(): Promise<{ explore: FooterLink[]; service: FooterLink[] }> {
+  const [attar, policies] = await Promise.all([hasActiveAttar().catch(() => false), livePolicyLinks().catch(() => [])]);
+  return {
+    explore: [
+      { label: "Perfumes", href: "/perfumes" },
+      ...(attar ? [{ label: "Attar", href: "/attar" }] : []),
+      { label: "Roll-On", href: "/roll-on" },
+      { label: "Personality Collection", href: "/collections/personality" },
+      { label: "Explore by Notes", href: "/notes" },
+      { label: "Best Sellers", href: "/best-sellers" },
+    ],
+    service: [
+      { label: "Contact Us", href: "/contact" },
+      { label: "About Us", href: ABOUT_ROUTE ?? "/#brand-story-heading" },
+      { label: "FAQs", href: "/faqs" },
+      ...policies.map(({ label, href }) => ({ label, href })),
+    ],
+  };
+}
 
 const LINK = "text-[14px] text-brand-text/75 transition-colors hover:text-brand-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold";
 
@@ -76,21 +83,13 @@ function LinkColumn({ title, links }: { title: string; links: FooterLink[] }) {
   return (
     <nav aria-label={title}>
       <FooterHeading>{title}</FooterHeading>
-      <ul className="mt-4 space-y-2.5">
+      <ul className="mt-3 space-y-0.5">
         {links.map((l) => (
           <li key={l.label}>
-            {l.href ? (
-              <Link href={l.href} className={LINK}>
-                {l.label}
-              </Link>
-            ) : (
-              <span className="text-[14px] text-brand-text/45" data-pending-link>
-                {l.label}
-                <span className="ml-2 rounded-full border border-brand-gold/30 bg-brand-cream/60 px-1.5 py-px text-[9.5px] tracking-[0.1em] text-brand-text/60 uppercase">
-                  Coming soon
-                </span>
-              </span>
-            )}
+            {/* 40px rows: comfortable touch targets without looking spaced out. */}
+            <Link href={l.href} className={`inline-flex min-h-10 items-center ${LINK}`}>
+              {l.label}
+            </Link>
           </li>
         ))}
       </ul>
@@ -156,13 +155,14 @@ function SocialLinks() {
 
 /* ---------------------------------------------------------------- footer --- */
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const { explore, service } = await footerLinks();
   const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CONTACT.addressLines.join(" "))}`;
 
   return (
     <footer className="border-t border-brand-gold/25 bg-white text-brand-black">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 pt-14 pb-10 sm:grid-cols-2 sm:px-8 sm:pt-16 lg:grid-cols-[1.5fr_1fr_1fr_0.9fr] lg:gap-12">
-        <div id="footer-contact" className="scroll-mt-6 sm:col-span-2 lg:col-span-1">
+      <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-10 px-4 pt-14 pb-10 sm:grid-cols-2 sm:px-8 sm:pt-16 lg:grid-cols-[1.5fr_1fr_1fr_0.9fr] lg:gap-12">
+        <div id="footer-contact" className="col-span-2 scroll-mt-6 lg:col-span-1">
           <FooterLogo />
           <p className="mt-5 max-w-sm text-[14px] leading-relaxed text-brand-text/75">
             Luftansa Fragrance Craft Hub brings together distinctive scents and thoughtful craftsmanship, created for every
@@ -197,10 +197,10 @@ export function SiteFooter() {
           </address>
         </div>
 
-        <LinkColumn title="Explore" links={EXPLORE} />
-        <LinkColumn title="Customer Service" links={SERVICE} />
+        <LinkColumn title="Explore" links={explore} />
+        <LinkColumn title="Customer Service" links={service} />
 
-        <div>
+        <div className="col-span-2 sm:col-span-1">
           <FooterHeading>Follow Us</FooterHeading>
           <SocialLinks />
           <a href={whatsappHref()} target="_blank" rel="noopener noreferrer" className={`mt-4 inline-block ${LINK}`}>

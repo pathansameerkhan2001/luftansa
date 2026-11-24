@@ -6,9 +6,9 @@
  * NOT product photographs. Replace with Luftansa photography by setting
  * `image.key` (an S3 key under "categories/") instead of `image.src`.
  *
- * `href` is intentionally unset: no collection route or note filtering exists
- * yet, and the card renders a non-link button while it is missing. Once the
- * route exists, set e.g. `href: "/collections?note=citrus"`.
+ * `href` opens the note family page (/notes/<slug>), which lists every
+ * fragrance whose confirmed notes belong to the family
+ * (src/lib/storefront/collection-pages.ts).
  *
  * Product-to-note assignments are NOT stored here; they must be added to the
  * catalogue (src/data/products.ts) only once confirmed.
@@ -32,13 +32,14 @@ export interface NoteCategory {
   title: string;
   description: string;
   image: NoteCategoryImage;
-  /** Filtered collection URL. Leave unset until the route exists. */
+  /** Note family page. */
   href?: string;
 }
 
 export const NOTE_CATEGORIES: readonly NoteCategory[] = [
   {
     slug: "citrus",
+    href: "/notes/citrus",
     label: "Citrus Notes",
     title: "Citrus Collection",
     description: "Fresh, vibrant and energizing scents.",
@@ -51,6 +52,7 @@ export const NOTE_CATEGORIES: readonly NoteCategory[] = [
   },
   {
     slug: "woody",
+    href: "/notes/woody",
     label: "Woody Notes",
     title: "Woody Collection",
     description: "Warm, rich and earthy fragrances.",
@@ -63,6 +65,7 @@ export const NOTE_CATEGORIES: readonly NoteCategory[] = [
   },
   {
     slug: "floral",
+    href: "/notes/floral",
     label: "Floral Notes",
     title: "Floral Collection",
     description: "Elegant, soft and timeless fragrances.",
@@ -75,6 +78,7 @@ export const NOTE_CATEGORIES: readonly NoteCategory[] = [
   },
   {
     slug: "oud",
+    href: "/notes/oud",
     label: "Oud Notes",
     title: "Oud Collection",
     description: "Deep, luxurious and long-lasting scents.",

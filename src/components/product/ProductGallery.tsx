@@ -4,11 +4,14 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
+import { ProductPhoto } from "./ProductPhoto";
 import type { ProductDetailData } from "./types";
 
 type GalleryImage = ProductDetailData["images"][number];
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-gold";
+/** Photo frame: square on phones/tablets, 4:5 on desktop and never taller than the screen. */
+const FRAME = "aspect-square lg:aspect-[4/5] lg:max-h-[calc(100svh-7rem)]";
 const ROUND_BTN = `inline-flex items-center justify-center rounded-full border border-brand-gold/50 bg-white/90 text-brand-black shadow-[0_6px_18px_-8px_rgba(23,23,23,0.35)] backdrop-blur-sm transition-colors hover:bg-white ${FOCUS}`;
 
 function prefersReducedMotion() {
@@ -21,15 +24,17 @@ function prefersReducedMotion() {
  *   thumbnails on every device, smooth transitions.
  * - Thumbnails: vertical rail on desktop, horizontal row under the photo on
  *   smaller screens.
- * - Zoom: hover-magnify with a fine pointer, plus a full-screen viewer
- *   (tap/click to zoom 2x and pan).
- * - Photos are shown whole (object-contain), never cropped or distorted.
+ * - Zoom: click/tap opens a full-screen viewer (tap to zoom 2x and pan).
+ *   There is no automatic hover-magnify: it made photos look over-zoomed.
+ * - Each photo is fitted by ProductPhoto: the bottle is made prominent
+ *   without cropping it or distorting the photo, whatever its shape.
+ * - Frame: square on phones and tablets (keeps the order controls close),
+ *   4:5 on desktop, never taller than the screen.
  * Only genuine product photographs are shown; with none, a neutral
  * placeholder is rendered.
  */
 export function ProductGallery({ name, images }: Pick<ProductDetailData, "name" | "images">) {
   const [active, setActive] = useState(0);
-  const [hoverZoom, setHoverZoom] = useState<{ x: number; y: number } | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const thumbRailRef = useRef<HTMLDivElement>(null);
@@ -76,20 +81,14 @@ export function ProductGallery({ name, images }: Pick<ProductDetailData, "name" 
     });
   }, [active]);
 
-  const onHoverMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "mouse" || prefersReducedMotion()) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    setHoverZoom({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 });
-  };
-
   if (count === 0) {
     return (
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[24px] bg-[radial-gradient(90%_75%_at_50%_40%,#fffdf8_0%,#f3ece0_70%,#eadfcd_100%)] ring-1 ring-brand-gold/25">
+      <div className={`relative w-full overflow-hidden rounded-[24px] bg-[radial-gradient(90%_75%_at_50%_40%,#fffdf8_0%,#f3ece0_70%,#eadfcd_100%)] ring-1 ring-brand-gold/25 ${FRAME}`}>
         <div aria-hidden="true" className="absolute inset-4 rounded-[18px] border border-brand-gold/30" />
         <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
           <PerfumeBottleIcon aria-hidden="true" className="size-20 text-brand-gold/60 sm:size-24" strokeWidth={0.6} />
           <p className="mt-4 font-serif text-[26px] leading-tight font-semibold italic text-brand-black sm:text-[30px]">{name}</p>
-          <p className="mt-1.5 text-[11px] font-medium tracking-[0.22em] text-brand-text/55 uppercase">Photograph coming soon</p>
+          <p className="mt-1.5 text-[11px] font-medium tracking-[0.22em] text-brand-text/55 uppercase">Luftansa Fragrance Craft Hub</p>
         </div>
       </div>
     );
@@ -105,43 +104,33 @@ export function ProductGallery({ name, images }: Pick<ProductDetailData, "name" 
           aria-label={`${name} photos`}
           className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-[24px] bg-[radial-gradient(110%_80%_at_50%_40%,#ffffff_0%,var(--brand-ivory)_45%,var(--brand-cream)_100%)] shadow-[0_28px_56px_-36px_rgba(60,45,20,0.5)] ring-1 ring-brand-gold/25 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {images.map((img, i) => {
-            const zoomed = hoverZoom !== null && i === active;
-            return (
-              <div
-                key={img.src + i}
-                role="group"
-                aria-roledescription="slide"
-                aria-label={`Photo ${i + 1} of ${count}`}
-                aria-hidden={i !== active}
-                className="relative aspect-[4/5] w-full shrink-0 snap-center overflow-hidden"
-                onPointerMove={i === active ? onHoverMove : undefined}
-                onPointerLeave={() => setHoverZoom(null)}
+          {images.map((img, i) => (
+            <div
+              key={img.src + i}
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`Photo ${i + 1} of ${count}`}
+              aria-hidden={i !== active}
+              className={`relative w-full shrink-0 snap-center overflow-hidden ${FRAME}`}
+            >
+              <button
+                type="button"
+                tabIndex={i === active ? 0 : -1}
+                onClick={() => setViewerOpen(true)}
+                aria-label={`Open full-screen view of photo ${i + 1}`}
+                className={`absolute inset-0 cursor-zoom-in rounded-[24px] ${FOCUS} focus-visible:-outline-offset-4`}
               >
-                <button
-                  type="button"
-                  tabIndex={i === active ? 0 : -1}
-                  onClick={() => setViewerOpen(true)}
-                  aria-label={`Open full-screen view of photo ${i + 1}`}
-                  className={`absolute inset-0 cursor-zoom-in rounded-[24px] ${FOCUS} focus-visible:-outline-offset-4`}
-                >
-                  <Image
-                    src={img.src}
-                    alt={img.alt}
-                    fill
-                    priority={i === 0}
-                    sizes="(min-width: 1280px) 600px, (min-width: 1024px) 48vw, 100vw"
-                    className="object-contain p-6 transition-transform duration-300 ease-out sm:p-10"
-                    style={{
-                      objectPosition: img.objectPosition ?? "50% 50%",
-                      transform: zoomed ? "scale(1.9)" : undefined,
-                      transformOrigin: zoomed ? `${hoverZoom.x}% ${hoverZoom.y}%` : undefined,
-                    }}
-                  />
-                </button>
-              </div>
-            );
-          })}
+                <ProductPhoto
+                  src={img.src}
+                  alt={img.alt}
+                  priority={i === 0}
+                  sizes="(min-width: 1280px) 640px, (min-width: 1024px) 50vw, (min-width: 640px) 600px, 100vw"
+                  preset="gallery"
+                  objectPosition={img.objectPosition}
+                />
+              </button>
+            </div>
+          ))}
         </div>
 
         <button
@@ -177,7 +166,7 @@ export function ProductGallery({ name, images }: Pick<ProductDetailData, "name" 
           ref={thumbRailRef}
           aria-label={`${name} photo thumbnails`}
           role="group"
-          className="-mx-1 flex gap-2.5 overflow-x-auto px-1 py-1 [scrollbar-width:none] lg:mx-0 lg:max-h-[640px] lg:w-[88px] lg:shrink-0 lg:flex-col lg:overflow-y-auto lg:overflow-x-visible lg:px-0.5 [&::-webkit-scrollbar]:hidden"
+          className="-mx-1 flex gap-2.5 overflow-x-auto px-1 py-1 [scrollbar-width:none] lg:mx-0 lg:max-h-[calc(100svh-7rem)] lg:w-[88px] lg:shrink-0 lg:flex-col lg:overflow-y-auto lg:overflow-x-visible lg:px-0.5 [&::-webkit-scrollbar]:hidden"
         >
           {images.map((img, i) => (
             <button
@@ -191,7 +180,7 @@ export function ProductGallery({ name, images }: Pick<ProductDetailData, "name" 
                 i === active ? "ring-2 ring-brand-black" : "opacity-80 ring-1 ring-brand-gold/30 hover:opacity-100 hover:ring-brand-gold"
               }`}
             >
-              <Image src={img.src} alt="" fill sizes="88px" className="object-contain p-1.5" style={{ objectPosition: img.objectPosition }} />
+              <ProductPhoto src={img.src} alt="" sizes="88px" preset="thumb" objectPosition={img.objectPosition} />
             </button>
           ))}
         </div>
