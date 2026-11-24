@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Gift, Star, Zap } from "lucide-react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
+import { ProductPhoto } from "@/components/product/ProductPhoto";
 import { formatInr } from "@/data/products";
 import type { Badge, BadgePosition, CollectionCardView, ImageRatio } from "@/lib/cms/modules/home-collections";
 import { BADGE_LABEL } from "@/lib/cms/modules/home-collections";
@@ -33,19 +33,18 @@ export function CollectionProductCard({ card, imageRatio, badgePosition }: { car
         className={`relative ${RATIO[imageRatio]} overflow-hidden rounded-[20px] bg-[radial-gradient(120%_85%_at_50%_38%,#ffffff_0%,var(--brand-ivory)_45%,#efe4cf_100%)] shadow-[0_14px_30px_-18px_rgba(60,40,15,0.45)] sm:rounded-[22px]`}
       >
         {image ? (
-          <Image
+          <ProductPhoto
             src={image.src}
             alt={image.alt}
-            fill
             sizes="(min-width: 1280px) 22vw, (min-width: 640px) 45vw, 82vw"
-            className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:scale-[1.045] motion-reduce:transition-none motion-reduce:group-hover/card:scale-100"
-            style={{ objectPosition: image.objectPosition ?? "50% 50%" }}
-            data-card-image
+            preset="card"
+            objectPosition={image.objectPosition}
+            imageClassName="transition-[transform,opacity] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:scale-[1.035] motion-reduce:transition-none motion-reduce:group-hover/card:scale-100"
           />
         ) : (
           <div aria-hidden="true" className="absolute inset-0" data-card-placeholder>
             <Placeholder className="absolute top-1/2 left-1/2 size-16 -translate-x-1/2 -translate-y-[60%] text-brand-gold/60 sm:size-20" strokeWidth={0.7} />
-            <span className="absolute inset-x-0 bottom-6 text-center text-[10.5px] font-medium tracking-[0.22em] text-brand-text/45 uppercase">Photograph coming soon</span>
+            <span className="absolute inset-x-0 bottom-6 text-center font-serif text-[17px] font-semibold tracking-[0.04em] text-brand-text/45 italic">Luftansa</span>
           </div>
         )}
 
@@ -98,7 +97,7 @@ export function CollectionProductCard({ card, imageRatio, badgePosition }: { car
             ) : null}
           </div>
         ) : (
-          <p className="mt-2.5 text-[13px] text-brand-text/60">Sizes &amp; pricing coming soon</p>
+          <p className="mt-2.5 text-[13px] text-brand-text/60">Ask us about sizes &amp; prices</p>
         )}
 
         {attributes.length ? (

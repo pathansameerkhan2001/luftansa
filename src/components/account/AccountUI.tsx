@@ -82,7 +82,7 @@ export function SetupNotice({ id = "account-setup-notice" }: { id?: string }) {
   return (
     <div id={id} role="status" data-account-setup className="flex gap-3 rounded-2xl border border-brand-gold/50 bg-brand-cream px-4 py-4 sm:px-5">
       <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-gold" strokeWidth={1.75} />
-      <div className="text-[14px] leading-relaxed text-brand-text/85">
+      <div className="min-w-0 text-[14px] leading-relaxed text-brand-text/85">
         <p className="font-semibold text-brand-black">Customer concierge & direct support</p>
         <p className="mt-1">
           Customer account registration is not required to shop with Luftansa. For order updates, personal recommendations,
@@ -104,10 +104,10 @@ export function ContactLinks() {
           WhatsApp<span className="sr-only"> (opens in a new tab)</span>
         </a>
       </li>
-      <li>
+      <li className="min-w-0">
         <a href={mailHref} className={link}>
-          <Mail aria-hidden="true" className="size-4 text-brand-gold" strokeWidth={1.75} />
-          {CONTACT.email}
+          <Mail aria-hidden="true" className="size-4 shrink-0 text-brand-gold" strokeWidth={1.75} />
+          <span className="min-w-0 break-all">{CONTACT.email}</span>
         </a>
       </li>
       <li>

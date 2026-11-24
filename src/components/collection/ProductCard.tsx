@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { PerfumeBottleIcon } from "@/components/benefits/BenefitsStrip";
+import { ProductPhoto } from "@/components/product/ProductPhoto";
 import { formatInr, hasPriceRange, startingPrice, type ProductOption } from "@/data/products";
 import { RollOnBottleIcon } from "./icons";
 
@@ -51,19 +51,20 @@ export function ProductCard({
           : ""
       }`}
     >
-      {/* Photograph: fixed 4:5 frame, bottle shown whole (never cropped or stretched). */}
+      {/* Photograph: fixed 4:5 frame. ProductPhoto makes the bottle prominent
+          without cropping or stretching it, whatever the photo's shape. */}
       <div
         data-carousel-media
         className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-[radial-gradient(120%_85%_at_50%_38%,#ffffff_0%,var(--brand-ivory)_45%,var(--brand-cream)_100%)]"
       >
         {image ? (
-          <Image
+          <ProductPhoto
             src={image.src}
             alt={image.alt}
-            fill
             sizes={imageSizes}
-            className="object-contain p-5 transition-transform duration-500 ease-out group-hover:scale-[1.035] motion-reduce:transition-none motion-reduce:group-hover:scale-100 sm:p-6"
-            style={{ objectPosition: image.objectPosition ?? "50% 50%" }}
+            preset="card"
+            objectPosition={image.objectPosition}
+            imageClassName="transition-[transform,opacity] duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         ) : (
           <div aria-hidden="true" className="absolute inset-0">
@@ -72,8 +73,8 @@ export function ProductCard({
               className="absolute top-1/2 left-1/2 size-16 -translate-x-1/2 -translate-y-[60%] text-brand-gold/55 sm:size-20"
               strokeWidth={0.7}
             />
-            <span className="absolute inset-x-0 bottom-7 text-center text-[10.5px] font-medium tracking-[0.22em] text-brand-text/45 uppercase">
-              Photograph coming soon
+            <span className="absolute inset-x-0 bottom-7 text-center font-serif text-[17px] font-semibold tracking-[0.04em] text-brand-text/45 italic">
+              Luftansa
             </span>
           </div>
         )}
@@ -95,7 +96,7 @@ export function ProductCard({
           <p className="mt-1.5 line-clamp-2 text-[14px] leading-relaxed text-brand-text/75">{description}</p>
         ) : null}
 
-        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-4">
           {fromPrice !== undefined ? (
             <p className="leading-none">
               {isRange ? (
@@ -108,7 +109,7 @@ export function ProductCard({
               </span>
             </p>
           ) : (
-            <p className="text-[13px] text-brand-text/60">Sizes &amp; pricing coming soon</p>
+            <p className="text-[13px] text-brand-text/60">Ask us about sizes &amp; prices</p>
           )}
 
           {href ? (

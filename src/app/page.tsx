@@ -17,6 +17,8 @@ export const revalidate = 3600;
 export default function Home() {
   return (
     <main>
+      {/* One stable page heading: hero slides rotate and their headings are optional. */}
+      <h1 className="sr-only">Luftansa Fragrance Craft Hub: luxury perfumes and roll-ons</h1>
       <HeroSection />
       <HomeBenefits />
       <HomeCollections />

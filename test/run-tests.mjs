@@ -62,3 +62,6 @@ await jiti.import("./trust-tags.test.ts");
 
 console.log("\nLoading our-story.test.ts via jiti...");
 await jiti.import("./our-story.test.ts");
+
+console.log("\nLoading site-polish.test.ts via jiti...");
+await jiti.import("./site-polish.test.ts");

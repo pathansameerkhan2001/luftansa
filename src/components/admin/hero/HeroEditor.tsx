@@ -295,7 +295,7 @@ export function HeroEditor() {
       </Card>
 
       <Card icon={<Type className="size-4.5" strokeWidth={1.5} />} title="Text and button" description="All optional. Leave them empty for an image-only hero, as the website shows today.">
-        <TextField id="hero-heading" label="Heading" value={form.heading} max={120} error={errors.heading} onChange={(heading) => set({ heading })} help="Shown as the page's main heading. Use only confirmed wording." />
+        <TextField id="hero-heading" label="Heading" value={form.heading} max={120} error={errors.heading} onChange={(heading) => set({ heading })} help="Shown as the large heading over the image. Use only confirmed wording." />
         <TextField id="hero-subtitle" label="Subtitle" value={form.subtitle} max={240} error={errors.subtitle} multiline onChange={(subtitle) => set({ subtitle })} />
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField id="hero-cta-label" label="Button label" value={form.ctaLabel} max={40} error={errors.ctaLabel} onChange={(ctaLabel) => set({ ctaLabel })} help="Both label and destination, or neither." />

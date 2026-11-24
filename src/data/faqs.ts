@@ -73,13 +73,12 @@ export const FAQS: readonly Faq[] = [
   {
     id: "order",
     question: "How can I place an order?",
-    answer: `Choose your fragrance, size and quantity on its product page and tap Order on WhatsApp to send your order details to us on WhatsApp. You can also ${contactLine}. Online checkout is coming soon.`,
+    answer: `Choose your fragrance, size and quantity on its product page and tap Order on WhatsApp to send your order details to us on WhatsApp. You can also ${contactLine}. Our team then confirms availability, payment and delivery details with you.`,
   },
   {
     id: "payments",
     question: "What payment methods are available?",
-    answer: POLICIES.payments ?? `Our payment options will be published here soon. Meanwhile, please ${contactLine} and our team will guide you.`,
-    pendingConfirmation: !POLICIES.payments,
+    answer: POLICIES.payments ?? `Nothing is charged on this website. Payment is arranged with our team on WhatsApp when your order is confirmed. For any question about payment, please ${contactLine}.`,
   },
   {
     id: "support",
@@ -91,7 +90,7 @@ export const FAQS: readonly Faq[] = [
     question: "What is the delivery and return policy?",
     answer:
       [POLICIES.delivery, POLICIES.returns].filter(Boolean).join(" ") ||
-      `Our delivery and return policies will be published here soon. For any questions about an order, please ${contactLine}.`,
+      `Delivery details for your order, including any charges and the expected delivery time, are confirmed with you on WhatsApp before your order is processed. Our Shipping Policy and Return Policy pages (linked at the bottom of every page) explain how this works. For any question about an order, please ${contactLine}.`,
     pendingConfirmation: !(POLICIES.delivery && POLICIES.returns),
   },
 ];
