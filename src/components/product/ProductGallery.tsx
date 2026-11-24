@@ -215,8 +215,9 @@ function ZoomViewer({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null);
-  const img = images[index];
   const count = images.length;
+  // Never index past the list (e.g. if the photos change while the viewer is open).
+  const img = images[Math.min(Math.max(index, 0), count - 1)];
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -240,6 +241,8 @@ function ZoomViewer({
     onIndexChange(index + delta);
   };
 
+  if (!img) return null;
+
   return (
     <dialog
       ref={dialogRef}
@@ -254,7 +257,12 @@ function ZoomViewer({
       <div className="relative h-full w-full">
         <div
           className={`relative h-full w-full overflow-hidden ${zoom ? "cursor-zoom-out" : "cursor-zoom-in"}`}
-          onPointerUp={(e) => setZoom((z) => (z ? null : pointAt(e)))}
+          onPointerUp={(e) => {
+            // Read the position now: React clears e.currentTarget once the handler returns, and a
+            // state updater may run later (e.g. on a double-click), which crashed the page.
+            const point = pointAt(e);
+            setZoom((z) => (z ? null : point));
+          }}
           onPointerMove={(e) => {
             if (zoom) setZoom(pointAt(e));
           }}
