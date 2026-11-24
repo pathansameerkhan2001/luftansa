@@ -2,7 +2,8 @@
   "git": {
     "deploymentEnabled": {
       "feature/homepage-cms": false,
-      "feature/site-polish": false
+      "feature/site-polish": false,
+      "fix/gallery-zoom-crash": false
     }
   }
 }
