@@ -71,3 +71,6 @@ await jiti.import("./collections-nav.test.ts");
 
 console.log("\nLoading fragrance-notes.test.ts via jiti...");
 await jiti.import("./fragrance-notes.test.ts");
+
+console.log("\nLoading media-images.test.ts via jiti...");
+await jiti.import("./media-images.test.ts");

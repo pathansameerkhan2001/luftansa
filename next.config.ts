@@ -16,6 +16,10 @@ if (process.env.ASSET_CDN_URL) {
 
 const nextConfig: NextConfig = {
   images: {
+    // Every image goes through src/lib/image-loader.ts (our own /media resizing
+    // and the photo CDNs' resizing) instead of Vercel's metered optimizer.
+    loader: "custom",
+    loaderFile: "./src/lib/image-loader.ts",
     formats: ["image/avif", "image/webp"],
     remotePatterns: cdnPatterns,
     // Cache optimized variants for a day; source objects rarely change.
