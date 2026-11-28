@@ -9,6 +9,7 @@ import {
   sprayOptions,
 } from "../src/data/products";
 import { FRAGRANCE_PROFILES, getNoteImage } from "../src/data/fragrance-profiles";
+import { FAMILY_IMAGES } from "../src/data/note-families";
 import { buildLegacyCatalogue } from "../src/lib/catalogue/legacy-catalogue";
 import {
   applyCatalogueImport,
@@ -129,7 +130,8 @@ console.log("3. Imported products render the same options, prices and notes as b
   const rizz = catalogue.find((p) => p.slug === "daily-rizz")!;
   assert.equal(rizz.hasNotes, true);
   assert.deepEqual(rizz.notes.top[0].image, getNoteImage("Citrus"), "Note image src and alt text preserved");
-  assert.equal(rizz.notes.heart[0].image, undefined);
+  // Musk has no ingredient photo: it gets a photo of its fragrance family (never an empty circle).
+  assert.ok(FAMILY_IMAGES.musky.some((i) => i.src === rizz.notes.heart[0].image?.src), "Musk: family photo");
 
   // Outage fallback renders the same catalogue.
   assert.deepEqual(slugsOf(fallbackStorefrontCatalogue()), slugsOf(catalogue));

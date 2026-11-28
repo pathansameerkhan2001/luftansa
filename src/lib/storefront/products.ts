@@ -2,6 +2,7 @@ import "server-only";
 
 import type { BottleSizeMl, ProductOption } from "@/data/products";
 import { getNoteImage } from "@/data/fragrance-profiles";
+import { withFamilyImages } from "@/data/note-families";
 import { displayName, productFormat, type ProductFormat } from "@/lib/catalogue/product-format";
 import { buildLegacyCatalogue } from "@/lib/catalogue/legacy-catalogue";
 import { getDataServices } from "@/lib/db/client";
@@ -86,7 +87,7 @@ export function toStorefrontOptions(variants: readonly ProductVariantItem[]): Pr
 function mapNotes(items: readonly FragranceNoteItem[] = []): StorefrontNote[] {
   return items.map((n) => {
     // The photo uploaded for this note in Admin → Products wins; a note without one
-    // uses the curated ingredient photography (if any) instead of an empty circle.
+    // uses the curated ingredient photography (if any); the rest get a family photo.
     const curated = getNoteImage(n.name);
     const uploaded = resolveAssetUrl(n.imageKey);
     const src = uploaded ?? curated?.src;
@@ -112,9 +113,8 @@ export function mapProductToStorefront(
     .filter((src): src is string => Boolean(src))
     .map((src, idx) => ({ src, alt: `${product.name} photograph ${idx + 1}` }));
 
-  const top = mapNotes(product.notes?.top);
-  const heart = mapNotes(product.notes?.heart);
-  const base = mapNotes(product.notes?.base);
+  // Note photos: uploaded → curated ingredient photo → fragrance-family photo (unique within the product).
+  const [top, heart, base] = withFamilyImages([mapNotes(product.notes?.top), mapNotes(product.notes?.heart), mapNotes(product.notes?.base)]);
   const hasNotes = (product.notesEnabled ?? true) && top.length + heart.length + base.length > 0;
 
   return {

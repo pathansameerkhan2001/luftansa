@@ -5,6 +5,9 @@ import type { RemotePattern } from "next/dist/shared/lib/image-config";
 const cdnPatterns: RemotePattern[] = [
   // Interim hero photography (Unsplash License) until Luftansa photos are in S3.
   { protocol: "https", hostname: "images.unsplash.com" },
+  // Fragrance-note ingredient photography (Pexels / Pixabay licences), src/data/fragrance-profiles.ts.
+  { protocol: "https", hostname: "images.pexels.com", pathname: "/photos/**" },
+  { protocol: "https", hostname: "cdn.pixabay.com", pathname: "/photo/**" },
 ];
 if (process.env.ASSET_CDN_URL) {
   const { protocol, hostname } = new URL(process.env.ASSET_CDN_URL);
