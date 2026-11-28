@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 /**
  * A collection from the header's COLLECTIONS menu (Admin → Collections Menu).
  * Inactive or unknown collections 404. A collection that opens an existing
- * page (e.g. Roll-On Air Freshener → /roll-on) redirects there, so the same
+ * page (e.g. Roll-On → /roll-on) redirects there, so the same
  * products never live at two addresses. An active collection without products
  * yet shows an empty state with ways onward, never an error.
  */

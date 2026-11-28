@@ -101,26 +101,37 @@ export const NAV_COLLECTIONS_MODULE = {
   payload: navCollectionsPayloadSchema as unknown as z.ZodType<Record<string, unknown>>,
 } as const satisfies CmsModuleDefinition;
 
+/** Product type of air fresheners (one of the standard product types, Admin → Products). */
+export const AIR_FRESHENER_TYPE_ID = "air-freshener";
 /** Product type of car fresheners (created in Admin → Products when the first one is added). */
 export const CAR_FRESHENER_TYPE_ID = "car-freshener";
 
 /**
- * Shown until the admin publishes their own settings. Roll-On Air Freshener
- * reuses the existing Roll-On listing (/roll-on, product type "roll-on"), so no
- * duplicate collection exists. Car Freshener has its own page and only ever
- * lists products of the "car-freshener" type, never Roll-Ons.
+ * Shown until the admin publishes their own settings. Roll-On reuses the
+ * existing Roll-On listing (/roll-on, product type "roll-on"), so no duplicate
+ * collection exists. Air Freshener and Car Freshener have their own pages and
+ * only ever list products of their own type ("air-freshener",
+ * "car-freshener"), so products are never mixed between collections.
  */
 export const NAV_COLLECTIONS_DEFAULT: NavCollectionsPayload = {
   menuLabel: "Collections",
   collections: [
     {
-      id: "roll-on-air-freshener",
-      name: "Roll-On Air Freshener",
+      id: "roll-on",
+      name: "Roll-On",
       slug: "roll-on",
       description: "Our fragrances in a convenient roll-on, for your bag, desk or travels.",
       enabled: true,
       linkTo: "/roll-on",
       selection: { mode: "product-type", productTypeId: "roll-on", productIds: [] },
+    },
+    {
+      id: "air-freshener",
+      name: "Air Freshener",
+      slug: "air-freshener",
+      description: "Luftansa fragrances for your home and workspace.",
+      enabled: true,
+      selection: { mode: "product-type", productTypeId: AIR_FRESHENER_TYPE_ID, productIds: [] },
     },
     {
       id: "car-freshener",
