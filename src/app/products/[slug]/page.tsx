@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { DeliveryInfo } from "@/components/product/DeliveryInfo";
-import { FragranceNotesShowcase } from "@/components/product/FragranceNotesShowcase";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductInfoSections } from "@/components/product/ProductInfoSections";
 import { ProductPurchase } from "@/components/product/ProductPurchase";
@@ -156,7 +155,6 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       </div>
 
       <TrustTagsSection tags={trustTags} />
-      <FragranceNotesShowcase product={data} />
       <RelatedFragrances products={related} />
       {/* Sticky mobile purchase bar hides once this point is reached (so it never covers the footer). */}
       <div id="pdp-end" aria-hidden="true" className="h-px" />

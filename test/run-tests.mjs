@@ -68,3 +68,6 @@ await jiti.import("./site-polish.test.ts");
 
 console.log("\nLoading collections-nav.test.ts via jiti...");
 await jiti.import("./collections-nav.test.ts");
+
+console.log("\nLoading fragrance-notes.test.ts via jiti...");
+await jiti.import("./fragrance-notes.test.ts");
