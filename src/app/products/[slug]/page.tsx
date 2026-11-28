@@ -8,10 +8,12 @@ import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductInfoSections } from "@/components/product/ProductInfoSections";
 import { ProductPurchase } from "@/components/product/ProductPurchase";
 import { RelatedFragrances } from "@/components/product/RelatedFragrances";
+import { TrustTagsSection } from "@/components/product/TrustTags";
 import type { ProductDetailData } from "@/components/product/types";
 import { STORE_NAME } from "@/data/store";
 import { FORMAT_LABEL, SECTION_LABEL, SECTION_ROUTE } from "@/lib/catalogue/product-format";
 import { loadPublished } from "@/lib/cms/loader";
+import { PRODUCT_PAGE_DEFAULT, PRODUCT_PAGE_MODULE, resolveProductPage } from "@/lib/cms/modules/product-page";
 import { resolveTrustTags, TRUST_TAGS_DEFAULT, TRUST_TAGS_MODULE, toTrustTagsView } from "@/lib/cms/modules/trust-tags";
 import { selectRelated } from "@/lib/storefront/collections";
 import { productJsonLd, productMetaDescription } from "@/lib/storefront/product-seo";
@@ -97,7 +99,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const sameSection = (await getActiveStorefrontProducts()).filter((p) => p.format === product.format);
   const related = selectRelated(sameSection, product, 4).map(toStorefrontCardData);
   // Global quality tags: never product data, so every product (new, imported, Perfume or Roll-On) shows them.
-  const trustTags = await loadPublished(TRUST_TAGS_MODULE, [TRUST_TAGS_DEFAULT]).then(resolveTrustTags, () => toTrustTagsView(TRUST_TAGS_DEFAULT));
+  const [trustTags, display] = await Promise.all([
+    loadPublished(TRUST_TAGS_MODULE, [TRUST_TAGS_DEFAULT]).then(resolveTrustTags, () => toTrustTagsView(TRUST_TAGS_DEFAULT)),
+    // Optional accordions (Description, FAQ): hidden unless switched on in Admin → Product Page Sections.
+    loadPublished(PRODUCT_PAGE_MODULE, [PRODUCT_PAGE_DEFAULT]).then(resolveProductPage, () => PRODUCT_PAGE_DEFAULT),
+  ]);
   const section = product.format === "other" ? null : product.format;
   const seoProduct = { ...product, name: product.displayName, category: data.category };
 
@@ -143,12 +149,13 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               <DeliveryInfo productName={data.name} />
             </div>
             <div className="mt-8">
-              <ProductInfoSections product={data} trustTags={trustTags} />
+              <ProductInfoSections product={data} display={display} />
             </div>
           </div>
         </div>
       </div>
 
+      <TrustTagsSection tags={trustTags} />
       <FragranceNotesShowcase product={data} />
       <RelatedFragrances products={related} />
       {/* Sticky mobile purchase bar hides once this point is reached (so it never covers the footer). */}

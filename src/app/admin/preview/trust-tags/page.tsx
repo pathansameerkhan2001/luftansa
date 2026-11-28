@@ -17,25 +17,12 @@ function Notice({ children }: { children: ReactNode }) {
   );
 }
 
-/** A sample DETAILS section, as product pages show it, with the trust tags. */
+/** The standalone quality section, as product pages show it (between the product and its notes). */
 function DetailsSample({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto max-w-[560px] px-4 py-6">
-      <p className="border-b border-brand-gold/30 py-4 text-[14px] font-semibold tracking-[0.12em] text-brand-black uppercase">Details</p>
-      <dl className="mt-4 divide-y divide-brand-gold/20 text-[14.5px]">
-        {[
-          ["Fragrance", "Sample fragrance"],
-          ["Type", "Perfume"],
-          ["Available sizes", "30 ml · 50 ml · 100 ml"],
-        ].map(([t, v]) => (
-          <div key={t} className="flex justify-between gap-4 py-2.5 first:pt-0">
-            <dt className="text-brand-text/65">{t}</dt>
-            <dd className="text-right font-medium text-brand-black">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      {children}
-    </div>
+    <section className="border-y border-brand-gold/20 bg-brand-ivory" data-trust-section>
+      <div className="mx-auto max-w-[1100px] px-4 py-10 sm:px-8 sm:py-12">{children}</div>
+    </section>
   );
 }
 
@@ -78,7 +65,7 @@ export default async function TrustTagsPreviewPage({ searchParams }: { searchPar
   }
 
   return (
-    <main className="min-h-dvh bg-brand-ivory" data-preview={`trust-tags-${version}`}>
+    <main className="min-h-dvh bg-brand-ivory py-6" data-preview={`trust-tags-${version}`}>
       {body}
     </main>
   );

@@ -1,5 +1,5 @@
 /**
- * Product trust tags CMS module: the global quality tags shown in the DETAILS
+ * Product trust tags CMS module: the global quality tags shown in their own
  * section of every product page (Perfumes and Roll-Ons alike), a single record
  * on the existing CMS. They never depend on product data, so every existing,
  * new or imported product shows them.

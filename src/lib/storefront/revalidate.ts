@@ -22,6 +22,8 @@ export function revalidateStorefront(productId?: string): void {
     // Collection pages built from product data.
     revalidatePath("/best-sellers");
     revalidatePath("/collections/personality");
+    // Header collections (Admin → Collections Menu).
+    revalidatePath("/collections/[slug]", "page");
     revalidatePath("/attar");
     revalidatePath("/notes/[family]", "page");
     revalidatePath("/search");

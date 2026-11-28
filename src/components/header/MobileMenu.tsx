@@ -2,11 +2,53 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Menu, User, X } from "lucide-react";
+import { ChevronDown, Heart, Menu, User, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { PRIMARY_NAV, SHOW_WISHLIST_ICON, UTILITY_LINKS, isActivePath } from "./nav-config";
+import { SHOW_WISHLIST_ICON, UTILITY_LINKS, isActiveItem, isActivePath, type NavItem, type NavLink } from "./nav-config";
 
-export function MobileMenu() {
+const LINK_CLASS = "flex items-center justify-between py-4 text-[13px] font-medium uppercase tracking-[0.2em] transition-colors hover:text-brand-gold focus-visible:outline-1 focus-visible:outline-brand-gold";
+
+/** Dropdown group in the drawer: tap to expand. Starts expanded when the current page is one of its links. */
+function MobileGroup({ label, items, pathname, onNavigate }: { label: string; items: readonly NavLink[]; pathname: string; onNavigate: () => void }) {
+  const active = items.some((i) => isActivePath(pathname, i.href));
+  const [expanded, setExpanded] = useState(active);
+  const listId = useId();
+  return (
+    <li data-mobile-nav-group>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={listId}
+        onClick={() => setExpanded((v) => !v)}
+        className={`${LINK_CLASS} min-h-12 w-full text-left ${active ? "text-brand-black" : "text-brand-text"}`}
+      >
+        <span className={active ? "border-b border-brand-gold pb-1" : "pb-1"}>{label}</span>
+        <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-brand-gold transition-transform duration-200 motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} strokeWidth={1.6} />
+      </button>
+      <ul id={listId} hidden={!expanded} aria-label={label} className="-mt-1 mb-3 border-l border-brand-gold/40 pl-4">
+        {items.map((item) => {
+          const current = isActivePath(pathname, item.href);
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-current={current ? "page" : undefined}
+                onClick={onNavigate}
+                className={`flex min-h-11 items-center py-2.5 text-[12px] font-medium uppercase tracking-[0.16em] transition-colors hover:text-brand-gold focus-visible:outline-1 focus-visible:outline-brand-gold ${
+                  current ? "text-brand-black" : "text-brand-text/80"
+                }`}
+              >
+                <span className={current ? "border-b border-brand-gold pb-0.5" : undefined}>{item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </li>
+  );
+}
+
+export function MobileMenu({ items }: { items: readonly NavItem[] }) {
   const pathname = usePathname();
   // Store the path the menu was opened on: navigating elsewhere closes it
   // automatically without a state-syncing effect.
@@ -96,17 +138,18 @@ export function MobileMenu() {
 
         <nav aria-label="Mobile primary" className="flex-1 overflow-y-auto px-5 py-4">
           <ul className="divide-y divide-brand-gold/15">
-            {PRIMARY_NAV.map((item) => {
-              const active = isActivePath(pathname, item.href);
+            {items.map((item) => {
+              if (item.children) {
+                return <MobileGroup key={`group:${item.label}`} label={item.label} items={item.children} pathname={pathname} onNavigate={() => setOpenedOn(null)} />;
+              }
+              const active = isActiveItem(pathname, item);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     onClick={() => setOpenedOn(null)}
-                    className={`flex items-center justify-between py-4 text-[13px] font-medium uppercase tracking-[0.2em] transition-colors hover:text-brand-gold focus-visible:outline-1 focus-visible:outline-brand-gold ${
-                      active ? "text-brand-black" : "text-brand-text"
-                    }`}
+                    className={`${LINK_CLASS} ${active ? "text-brand-black" : "text-brand-text"}`}
                   >
                     <span className={active ? "border-b border-brand-gold pb-1" : "pb-1"}>
                       {item.label}
