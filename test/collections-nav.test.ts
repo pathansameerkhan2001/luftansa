@@ -8,6 +8,7 @@ import { resolvePublished } from "@/lib/cms/published";
 import { CMS_MODULES, getCmsModule } from "@/lib/cms/registry";
 import { createEntry, listEntries, publishEntry, saveDraft, unpublishEntry } from "@/lib/cms/service";
 import {
+  AIR_FRESHENER_TYPE_ID,
   CAR_FRESHENER_TYPE_ID,
   collectionHref,
   findActiveCollection,
@@ -29,13 +30,14 @@ const D = NAV_COLLECTIONS_DEFAULT;
 const appDir = new URL("../src/app/", import.meta.url);
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 
-console.log("1. Header: COLLECTIONS replaces Roll-On, with the two default collections...");
+console.log("1. Header: COLLECTIONS replaces Roll-On, with exactly Roll-On, Air Freshener, Car Freshener...");
 const nav = buildPrimaryNav(toCollectionsMenu(D));
 {
   assert.deepEqual(nav.map((n) => n.label), ["Home", "Perfumes", "Collections", "Our Story", "Contact Us"]);
   const group = nav.find((n) => n.children);
   assert.deepEqual(group?.children, [
-    { label: "Roll-On Air Freshener", href: "/roll-on" },
+    { label: "Roll-On", href: "/roll-on" },
+    { label: "Air Freshener", href: "/collections/air-freshener" },
     { label: "Car Freshener", href: "/collections/car-freshener" },
   ]);
   assert.ok(!nav.some((n) => n.label === "Roll-On"), "no separate ROLL-ON item");
@@ -49,13 +51,13 @@ const nav = buildPrimaryNav(toCollectionsMenu(D));
   assert.ok(isActiveItem("/collections/car-freshener", group!), "group active on one of its pages");
   assert.ok(isActiveItem("/roll-on", group!));
   assert.ok(!isActiveItem("/perfumes", group!));
-  console.log("   ✓ Home, Perfumes, Collections (Roll-On Air Freshener, Car Freshener), Our Story, Contact Us; all links exist");
+  console.log("   ✓ Home, Perfumes, Collections (Roll-On, Air Freshener, Car Freshener), Our Story, Contact Us; all links exist");
 }
 
 console.log("2. Inactive collections and deactivation...");
 {
   const oneOff: NavCollectionsPayload = { ...D, collections: D.collections.map((c) => (c.id === "car-freshener" ? { ...c, enabled: false } : c)) };
-  assert.deepEqual(toCollectionsMenu(oneOff)?.items.map((i) => i.label), ["Roll-On Air Freshener"], "inactive: left out of the menu");
+  assert.deepEqual(toCollectionsMenu(oneOff)?.items.map((i) => i.label), ["Roll-On", "Air Freshener"], "inactive: left out of the menu");
   assert.equal(findActiveCollection(oneOff, "car-freshener"), undefined, "inactive: its page 404s");
   assert.equal(toCollectionsMenu({ ...D, collections: D.collections.map((c) => ({ ...c, enabled: false })) }), null, "none active: no COLLECTIONS item");
   assert.equal(toCollectionsMenu(null), null, "deactivated: no COLLECTIONS item");
@@ -75,10 +77,13 @@ console.log("3. Products: by type (never mixing), manual order, empty, inactive 
     { slug: "oud-roll-on", name: "Oud", productTypeId: "roll-on", displayOrder: 1 },
     { slug: "black-velvet", name: "Black Velvet", productTypeId: "perfume-spray" },
     { slug: "car-oud", name: "Car Oud", productTypeId: CAR_FRESHENER_TYPE_ID },
+    { slug: "room-rose", name: "Room Rose", productTypeId: AIR_FRESHENER_TYPE_ID },
   ];
-  const [rollOn, car] = D.collections;
+  const [rollOn, air, car] = D.collections;
   assert.deepEqual(selectNavCollectionProducts(rollOn, products).map((p) => p.slug), ["oud-roll-on", "black-velvet-roll-on"], "Roll-On: roll-ons only, display order");
-  assert.deepEqual(selectNavCollectionProducts(car, products).map((p) => p.slug), ["car-oud"], "Car Freshener: car fresheners only, never roll-ons");
+  assert.deepEqual(selectNavCollectionProducts(car, products).map((p) => p.slug), ["car-oud"], "Car Freshener: car fresheners only, never roll-ons or air fresheners");
+  assert.deepEqual(selectNavCollectionProducts(air, products).map((p) => p.slug), ["room-rose"], "Air Freshener: air fresheners only");
+  assert.equal(collectionHref(air), "/collections/air-freshener", "Air Freshener: its own page");
   assert.deepEqual(selectNavCollectionProducts(car, products.slice(0, 3)), [], "no car fresheners yet: empty (page shows coming soon)");
   const manual = { selection: { mode: "manual" as const, productIds: ["car-oud", "missing", "oud-roll-on"] } };
   assert.deepEqual(selectNavCollectionProducts(manual, products).map((p) => p.slug), ["car-oud", "oud-roll-on"], "manual: chosen order; hidden/deleted products skipped");
@@ -91,7 +96,7 @@ console.log("4. Validation...");
 {
   assert.ok(navCollectionsPayloadSchema.safeParse(D).success, "defaults valid");
   const withCollections = (collections: unknown) => navCollectionsPayloadSchema.safeParse({ ...D, collections });
-  const c0 = D.collections[1];
+  const c0 = D.collections[2];
   assert.ok(!withCollections([c0, { ...c0, id: "other" }]).success, "duplicate web address refused");
   assert.ok(!withCollections([{ ...c0, slug: "Car Freshener" }]).success, "slug format");
   assert.ok(!withCollections([{ ...c0, slug: "personality" }]).success, "reserved slug (existing page)");
@@ -114,17 +119,17 @@ await (async () => {
   const ctx = { repo, audit: new AuditService(repo), actorEmail: "admin@luftansa.local" };
   const menu = async () => toCollectionsMenu(resolveNavCollections(resolvePublished(await listEntries(repo, NAV_COLLECTIONS_MODULE), [D], new Date())));
 
-  assert.equal((await menu())?.items.length, 2, "nothing saved: defaults");
+  assert.equal((await menu())?.items.length, 3, "nothing saved: defaults");
   const added: NavCollectionsPayload = { ...D, collections: [...D.collections, { id: "gift-sets", name: "Gift Sets", slug: "gift-sets", enabled: true, selection: { mode: "manual", productIds: ["a"] } }] };
   const draft = await createEntry(ctx, NAV_COLLECTIONS_MODULE, { draft: added });
-  assert.equal((await menu())?.items.length, 2, "a draft never changes the header");
+  assert.equal((await menu())?.items.length, 3, "a draft never changes the header");
   await assert.rejects(() => saveDraft(ctx, NAV_COLLECTIONS_MODULE, draft.id, { ...added, collections: [{ ...added.collections[0], slug: "Bad Slug" }] }, draft.version), (e: unknown) => e instanceof ValidationError, "server validates");
   const pub = await publishEntry(ctx, NAV_COLLECTIONS_MODULE, draft.id, draft.version);
-  assert.deepEqual((await menu())?.items.map((i) => i.label), ["Roll-On Air Freshener", "Car Freshener", "Gift Sets"], "published: new collection in the menu");
-  const reordered = { ...added, collections: [added.collections[2], { ...added.collections[1], enabled: false }, added.collections[0]] };
+  assert.deepEqual((await menu())?.items.map((i) => i.label), ["Roll-On", "Air Freshener", "Car Freshener", "Gift Sets"], "published: new collection in the menu");
+  const reordered = { ...added, collections: [added.collections[3], { ...added.collections[2], enabled: false }, added.collections[0], added.collections[1]] };
   const saved = await saveDraft(ctx, NAV_COLLECTIONS_MODULE, pub.id, reordered, pub.version);
   const pub2 = await publishEntry(ctx, NAV_COLLECTIONS_MODULE, saved.id, saved.version);
-  assert.deepEqual((await menu())?.items.map((i) => i.label), ["Gift Sets", "Roll-On Air Freshener"], "reorder + deactivate one");
+  assert.deepEqual((await menu())?.items.map((i) => i.label), ["Gift Sets", "Roll-On", "Air Freshener"], "reorder + deactivate one");
   await unpublishEntry(ctx, NAV_COLLECTIONS_MODULE, pub2.id, pub2.version);
   assert.equal(await menu(), null, "deactivated: no menu");
   console.log("   ✓ defaults until published, drafts private, validation, create/edit/reorder/activate, deactivate");

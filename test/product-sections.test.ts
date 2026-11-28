@@ -173,7 +173,7 @@ console.log("8. Navigation: only pages that exist...");
   assert.equal(PRIMARY_NAV.find((n) => n.label === "Contact Us")?.href, "/contact", "Contact Us opens its page (src/app/contact/page.tsx)");
   assert.equal(PRIMARY_NAV.find((n) => n.label === "Our Story")?.href, "/our-story", "Our Story opens its page (src/app/our-story/page.tsx)");
   assert.equal(SHOW_WISHLIST_ICON, false, "wishlist icon hidden until /wishlist exists");
-  console.log("   ✓ Home, Perfumes, Collections (Roll-On Air Freshener, Car Freshener), Our Story, Contact Us");
+  console.log("   ✓ Home, Perfumes, Collections (Roll-On, Air Freshener, Car Freshener), Our Story, Contact Us");
 }
 
 console.log("--- Perfume / Roll-On section tests passed ---");

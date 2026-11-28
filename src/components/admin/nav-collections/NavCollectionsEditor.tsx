@@ -243,7 +243,7 @@ export function NavCollectionsEditor() {
       <FeedbackBanner feedback={feedback} onDismiss={clear} />
       {!cms.entry ? (
         <p className="rounded-xl border border-[#e5c98f] bg-[#fdf4e2] px-4 py-3 text-[13.5px] text-[#7a5a2b]" data-default-note>
-          The website currently shows the default menu below (Roll-On Air Freshener and Car Freshener). Edit it, then publish to replace it.
+          The website currently shows the default menu below (Roll-On, Air Freshener and Car Freshener). Edit it, then publish to replace it.
         </p>
       ) : null}
       {loadIssue ? <FeedbackBanner feedback={{ tone: "error", message: `Products could not be loaded: ${loadIssue}` }} onDismiss={() => setLoadIssue(null)} /> : null}
@@ -435,7 +435,7 @@ export function NavCollectionsEditor() {
                       ))}
                     </ul>
                   )}
-                  <p className="mt-1.5 text-[12px] text-brand-text/55">Keep each collection to one kind of product: for example, add only car fresheners to Car Freshener (never personal Roll-Ons).</p>
+                  <p className="mt-1.5 text-[12px] text-brand-text/55">Keep each collection to one kind of product: for example, add only car fresheners to Car Freshener and only air fresheners to Air Freshener (never Roll-Ons).</p>
                 </div>
               </div>
             )}
