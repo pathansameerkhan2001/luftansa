@@ -5,6 +5,8 @@ import {
   ImageIcon,
   LayoutDashboard,
   LayoutGrid,
+  LayoutList,
+  ListTree,
   Milestone,
   Clapperboard,
   Megaphone,
@@ -37,6 +39,8 @@ const HERO: AdminNavItem = { label: "Hero Section", href: "/admin/hero", Icon: P
 const ANNOUNCEMENT: AdminNavItem = { label: "Announcement Bar", href: "/admin/announcement-bar", Icon: Megaphone, description: "Messages in the bar above the header: order, schedule and display." };
 const BRAND_STORY: AdminNavItem = { label: "Brand Story", href: "/admin/brand-story", Icon: BookOpen, description: "Homepage “Our Brand” section: image, story, button and layout." };
 const COLLECTIONS: AdminNavItem = { label: "Homepage Collections", href: "/admin/collections", Icon: LayoutGrid, description: "Personality and Roll-On collections: products, headings, badges and design." };
+const NAV_COLLECTIONS: AdminNavItem = { label: "Collections Menu", href: "/admin/nav-collections", Icon: ListTree, description: "Header COLLECTIONS dropdown: collections, pages, images, products and order." };
+const PRODUCT_PAGE: AdminNavItem = { label: "Product Page Sections", href: "/admin/product-page", Icon: LayoutList, description: "Show or hide the Description and FAQ sections on product pages." };
 const TRUST_TAGS: AdminNavItem = { label: "Product Trust Tags", href: "/admin/trust-tags", Icon: ShieldCheck, description: "Quality tags on every product page: labels, order and visibility." };
 const OUR_STORY: AdminNavItem = { label: "Our Story", href: "/admin/our-story", Icon: Milestone, description: "The Our Story page: brand statement, why we started and the journey steps." };
 const POLICIES: AdminNavItem = { label: "Policy Pages", href: "/admin/policies", Icon: ScrollText, description: "Shipping, Return, Privacy and Terms pages: text, preview and publishing." };
@@ -50,7 +54,7 @@ const MEDIA: AdminNavItem = { label: "Media Library", href: "/admin/media", Icon
  */
 export const ADMIN_NAV_GROUPS: readonly AdminNavGroup[] = [
   { label: "Store Management", items: [DASHBOARD, PRODUCTS] },
-  { label: "Website", items: [HERO, ANNOUNCEMENT, COLLECTIONS, BRAND_STORY, OUR_STORY, REELS, TRUST_TAGS, POLICIES] },
+  { label: "Website", items: [HERO, ANNOUNCEMENT, NAV_COLLECTIONS, COLLECTIONS, BRAND_STORY, OUR_STORY, REELS, TRUST_TAGS, PRODUCT_PAGE, POLICIES] },
   { label: "Media", items: [MEDIA] },
 ];
 

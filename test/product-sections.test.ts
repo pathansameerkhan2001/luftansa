@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import {
   bySection, categoryForType, countUniqueFragrances, signatureScentsTitle, displayName, fragranceKey, looksLikeRollOnVariant, perfumesWithRollOnSizes, productFormat, productIdFor, SECTION_ROUTE,
 } from "@/lib/catalogue/product-format";
-import { PRIMARY_NAV, SHOW_WISHLIST_ICON } from "@/components/header/nav-config";
+import { buildPrimaryNav, SHOW_WISHLIST_ICON } from "@/components/header/nav-config";
+import { NAV_COLLECTIONS_DEFAULT, toCollectionsMenu } from "@/lib/cms/modules/nav-collections";
 import { fragranceNotesSchema, MAX_NOTES_PER_GROUP, productCreateInputSchema } from "@/lib/db/schemas";
 import { ENTITY } from "@/lib/db/keys";
 import type { ProductItem, ProductVariantItem } from "@/lib/db/schemas";
 import { buildStorefrontCatalogue, mapProductToStorefront, toStorefrontCardData } from "@/lib/storefront/products";
 import { queryWords, searchProducts } from "@/lib/storefront/search";
 import { buildWhatsAppOrderMessage } from "@/lib/storefront/whatsapp-order";
+
+const PRIMARY_NAV = buildPrimaryNav(toCollectionsMenu(NAV_COLLECTIONS_DEFAULT));
 
 console.log("--- Testing Perfume / Roll-On sections ---");
 
@@ -159,18 +162,18 @@ console.log("7. Notes: up to 12 per group...");
 
 console.log("8. Navigation: only pages that exist...");
 {
-  assert.deepEqual(PRIMARY_NAV.map((n) => n.label), ["Home", "Perfumes", "Roll-On", "Our Story", "Contact Us"]);
+  assert.deepEqual(PRIMARY_NAV.map((n) => n.label), ["Home", "Perfumes", "Collections", "Our Story", "Contact Us"]);
   // Every link must have a page file (src/app/<path>/page.tsx).
   const { existsSync } = await import("node:fs");
   const appDir = new URL("../src/app/", import.meta.url);
-  for (const n of PRIMARY_NAV) {
-    const path = n.href.split(/[?#]/)[0].replace(/^\//, "");
+  for (const n of PRIMARY_NAV.flatMap((i) => (i.children ? i.children : [i]))) {
+    const path = n.href.split(/[?#]/)[0].replace(/^\//, "").replace(/^collections\/[a-z0-9-]+$/, "collections/[slug]");
     assert.ok(existsSync(new URL(path ? `${path}/page.tsx` : "page.tsx", appDir)), `no links to pages that do not exist: ${n.href}`);
   }
   assert.equal(PRIMARY_NAV.find((n) => n.label === "Contact Us")?.href, "/contact", "Contact Us opens its page (src/app/contact/page.tsx)");
   assert.equal(PRIMARY_NAV.find((n) => n.label === "Our Story")?.href, "/our-story", "Our Story opens its page (src/app/our-story/page.tsx)");
   assert.equal(SHOW_WISHLIST_ICON, false, "wishlist icon hidden until /wishlist exists");
-  console.log("   ✓ Home, Perfumes, Roll-On, Our Story, Contact Us");
+  console.log("   ✓ Home, Perfumes, Collections (Roll-On Air Freshener, Car Freshener), Our Story, Contact Us");
 }
 
 console.log("--- Perfume / Roll-On section tests passed ---");

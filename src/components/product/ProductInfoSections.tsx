@@ -1,8 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { productPageFaqs } from "@/data/faqs";
-import type { TrustTagView } from "@/lib/cms/modules/trust-tags";
-import { TrustTags } from "./TrustTags";
+import { PRODUCT_PAGE_DEFAULT, type ProductPagePayload } from "@/lib/cms/modules/product-page";
 import type { ProductDetailData } from "./types";
 
 /**
@@ -10,11 +9,13 @@ import type { ProductDetailData } from "./types";
  * and screen-reader friendly, works on every screen size).
  *
  * Only sections backed by real information are rendered:
- * - Description: the product's own description.
+ * - Description: the product's own description (hidden unless switched on in
+ *   Admin → Product Page Sections; the description itself is never removed).
  * - Fragrance Notes: confirmed notes (summary; the visual section shows them in full).
  * - Details: confirmed product facts only (no "to be confirmed" rows).
  * - How to Use & Care: general application/storage guidance (no product claims).
- * - FAQs: existing, confirmed store FAQs relevant to a product page.
+ * - FAQs: existing, confirmed store FAQs relevant to a product page (hidden
+ *   unless switched on in Admin → Product Page Sections; /faqs is unchanged).
  * Ingredients / product-specific care are not part of the product data yet,
  * so those sections are not shown.
  */
@@ -48,8 +49,11 @@ function Section({ title, defaultOpen, children }: { title: string; defaultOpen?
   );
 }
 
-/** `trustTags`: the global quality tags (Admin → Product Trust Tags), the same on every product page. */
-export function ProductInfoSections({ product, trustTags = [] }: { product: ProductDetailData; trustTags?: readonly TrustTagView[] }) {
+/**
+ * `display`: optional sections (Admin → Product Page Sections). The trust tags
+ * are a separate section of the product page (./TrustTags).
+ */
+export function ProductInfoSections({ product, display = PRODUCT_PAGE_DEFAULT }: { product: ProductDetailData; display?: ProductPagePayload }) {
   const notes = hasAnyNotes(product) ? product.fragranceNotes : undefined;
   const details: [string, string][] = [
     ["Fragrance", product.name],
@@ -59,18 +63,19 @@ export function ProductInfoSections({ product, trustTags = [] }: { product: Prod
   if (product.concentration) details.push(["Concentration", product.concentration]);
   if (product.gender) details.push(["Gender", product.gender]);
   if (product.keywords && product.keywords.length > 0) details.push(["Keywords", product.keywords.join(" · ")]);
-  const faqs = productPageFaqs();
+  const description = display.showDescription ? product.description : undefined;
+  const faqs = display.showFaq ? productPageFaqs() : [];
 
   return (
     <div className="border-t border-brand-gold/30">
-      {product.description ? (
+      {description ? (
         <Section title="Description" defaultOpen>
-          <p className="whitespace-pre-line text-pretty">{product.description}</p>
+          <p className="whitespace-pre-line text-pretty">{description}</p>
         </Section>
       ) : null}
 
       {notes ? (
-        <Section title="Fragrance Notes" defaultOpen={!product.description}>
+        <Section title="Fragrance Notes" defaultOpen={!description}>
           <dl className="space-y-2.5">
             {(
               [
@@ -96,7 +101,7 @@ export function ProductInfoSections({ product, trustTags = [] }: { product: Prod
         </Section>
       ) : null}
 
-      <Section title="Details" defaultOpen={!product.description && !notes}>
+      <Section title="Details" defaultOpen={!description && !notes}>
         <dl className="divide-y divide-brand-gold/20">
           {details.map(([term, value]) => (
             <div key={term} className="flex justify-between gap-4 py-2.5 first:pt-0">
@@ -105,7 +110,6 @@ export function ProductInfoSections({ product, trustTags = [] }: { product: Prod
             </div>
           ))}
         </dl>
-        <TrustTags tags={trustTags} />
       </Section>
 
       <Section title="How to Use & Care">

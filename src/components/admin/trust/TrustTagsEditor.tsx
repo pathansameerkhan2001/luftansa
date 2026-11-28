@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Admin: global trust tags on every product page (DETAILS section), on the
+ * Admin: global trust tags on every product page (their own section), on the
  * existing CMS: save a draft, preview, publish, or deactivate (hides every
  * tag). Labels, order and on/off per tag; the icons belong to each tag.
  */
@@ -87,7 +87,7 @@ export function TrustTagsEditor() {
       <PageIntro
         eyebrow="Website"
         title="Product Trust Tags"
-        description="The quality tags in the DETAILS section of every product page, Perfumes and Roll-Ons alike. They apply to every product automatically, including new and imported ones. Save a draft, check the preview, then publish. Deactivate hides all of them."
+        description="The quality tags shown in their own section of every product page, below the product, Perfumes and Roll-Ons alike. They apply to every product automatically, including new and imported ones. Save a draft, check the preview, then publish. Deactivate hides all of them."
       />
 
       <PublishBar
@@ -171,8 +171,8 @@ export function TrustTagsEditor() {
             draftSrc="/admin/preview/trust-tags?version=draft"
             liveSrc="/admin/preview/trust-tags?version=live"
             reloadKey={cms.entry ? `${cms.entry.version}` : "none"}
-            frameHeight={520}
-            note={dirty ? "The preview shows the last saved draft. Save to see your latest changes." : "The DETAILS section as product pages show it, at each device's real width."}
+            frameHeight={360}
+            note={dirty ? "The preview shows the last saved draft. Save to see your latest changes." : "The quality section as product pages show it, at each device's real width."}
           />
         </div>
       </section>

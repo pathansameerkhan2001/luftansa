@@ -26,22 +26,41 @@ const ICON: Record<TrustTagId, LucideIcon | typeof ChakraIcon> = {
 
 /**
  * Global quality tags (Admin → Product Trust Tags): thin line icons above
- * short labels, three per row on wider screens and two on phones, with a
- * final odd tag centred. Same on every product page.
+ * short labels. A list only: the product page places it in its own section
+ * (TrustTagsSection). Two per row on phones, three on tablets and all five in
+ * one row on desktop; a final odd tag is centred. Same on every product page.
  */
 export function TrustTags({ tags }: { tags: readonly TrustTagView[] }) {
   if (tags.length === 0) return null;
   return (
-    <ul aria-label="Quality promises" className="mt-5 flex flex-wrap justify-center gap-y-6 border-t border-brand-gold/20 pt-6" data-trust-tags>
+    <ul aria-label="Quality promises" className="flex flex-wrap justify-center gap-y-7 sm:gap-y-8" data-trust-tags>
       {tags.map(({ id, label }) => {
         const Icon = ICON[id];
         return (
-          <li key={id} className="flex w-1/2 flex-col items-center px-2 text-center sm:w-1/3" data-trust-tag={id}>
+          <li key={id} className="flex w-1/2 min-w-0 flex-col items-center px-2 text-center sm:w-1/3 lg:w-auto lg:flex-1" data-trust-tag={id}>
             <Icon aria-hidden="true" className="size-8 text-brand-black" strokeWidth={1.1} />
-            <span className="mt-2.5 text-[14px] leading-snug text-pretty text-brand-black sm:text-[14.5px]">{label}</span>
+            <span className="mt-2.5 max-w-[16ch] text-[14px] lg:max-w-[20ch] leading-snug text-pretty text-brand-black sm:text-[14.5px]">{label}</span>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * Standalone product-page section for the trust tags: full width between the
+ * product and the fragrance notes, not nested in any accordion or column.
+ */
+export function TrustTagsSection({ tags }: { tags: readonly TrustTagView[] }) {
+  if (tags.length === 0) return null;
+  return (
+    <section aria-labelledby="quality-promises-heading" className="border-y border-brand-gold/20 bg-brand-ivory" data-trust-section>
+      <div className="mx-auto max-w-[1100px] px-4 py-10 sm:px-8 sm:py-12">
+        <h2 id="quality-promises-heading" className="sr-only">
+          Our quality promises
+        </h2>
+        <TrustTags tags={tags} />
+      </div>
+    </section>
   );
 }

@@ -4,7 +4,7 @@ import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { InMemoryDynamoClient } from "@/../test/helpers/in-memory-dynamo";
 import { FAQS } from "@/data/faqs";
 import { NOTE_CATEGORIES } from "@/data/note-categories";
-import { PRIMARY_NAV } from "@/components/header/nav-config";
+import { buildPrimaryNav } from "@/components/header/nav-config";
 import { composeContactMessage } from "@/lib/storefront/contact-message";
 import { resolvePublished } from "@/lib/cms/published";
 import { CMS_MODULES, getCmsModule } from "@/lib/cms/registry";
@@ -14,6 +14,8 @@ import { AuditService } from "@/lib/db/audit";
 import { Repository } from "@/lib/db/repository";
 import { inNoteFamily, selectAttar, selectNoteFamily } from "@/lib/storefront/collection-pages";
 import { analysePixels, coverCrop, decideFit, FIT_PRESETS, scaleSizes } from "@/lib/storefront/image-fit";
+
+const PRIMARY_NAV = buildPrimaryNav(null);
 
 console.log("--- Testing site polish (image fit, policy pages, collection pages) ---");
 
