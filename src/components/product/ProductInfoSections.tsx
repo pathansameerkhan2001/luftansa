@@ -2,6 +2,7 @@ import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { productPageFaqs } from "@/data/faqs";
 import { PRODUCT_PAGE_DEFAULT, type ProductPagePayload } from "@/lib/cms/modules/product-page";
+import { FragranceNoteCircles } from "./FragranceNoteCircles";
 import type { ProductDetailData } from "./types";
 
 /**
@@ -11,7 +12,8 @@ import type { ProductDetailData } from "./types";
  * Only sections backed by real information are rendered:
  * - Description: the product's own description (hidden unless switched on in
  *   Admin → Product Page Sections; the description itself is never removed).
- * - Fragrance Notes: confirmed notes (summary; the visual section shows them in full).
+ * - Fragrance Notes: confirmed notes as circular ingredient images
+ *   (./FragranceNoteCircles); the only place the notes appear on the page.
  * - Details: confirmed product facts only (no "to be confirmed" rows).
  * - How to Use & Care: general application/storage guidance (no product claims).
  * - FAQs: existing, confirmed store FAQs relevant to a product page (hidden
@@ -76,28 +78,7 @@ export function ProductInfoSections({ product, display = PRODUCT_PAGE_DEFAULT }:
 
       {notes ? (
         <Section title="Fragrance Notes" defaultOpen={!description}>
-          <dl className="space-y-2.5">
-            {(
-              [
-                ["Top", notes.top],
-                ["Heart", notes.heart],
-                ["Base", notes.base],
-              ] as const
-            )
-              .filter(([, items]) => items.length > 0)
-              .map(([tier, items]) => (
-                <div key={tier} className="flex gap-4">
-                  <dt className="w-14 shrink-0 text-[12px] font-semibold tracking-[0.14em] text-brand-text/60 uppercase">{tier}</dt>
-                  <dd className="text-brand-black">{items.map((n) => n.name).join(" · ")}</dd>
-                </div>
-              ))}
-          </dl>
-          <a
-            href="#fragrance-notes"
-            className="mt-3 inline-block text-[13px] font-medium text-brand-black underline decoration-brand-gold/70 underline-offset-4 hover:decoration-brand-black"
-          >
-            Explore the notes
-          </a>
+          <FragranceNoteCircles notes={notes} />
         </Section>
       ) : null}
 

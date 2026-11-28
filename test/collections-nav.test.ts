@@ -150,7 +150,7 @@ await (async () => {
   for (const title of ["Fragrance Notes", "Details", "How to Use & Care"]) assert.ok(sections.includes(`title="${title}"`), `${title} kept`);
   assert.ok(!sections.includes("<TrustTags"), "trust tags no longer nested in DETAILS");
   const page = read("app/products/[slug]/page.tsx");
-  assert.match(page, /<TrustTagsSection tags=\{trustTags\} \/>\s*<FragranceNotesShowcase/, "trust tags: standalone section after the product");
+  assert.match(page, /<TrustTagsSection tags=\{trustTags\} \/>\s*<RelatedFragrances/, "trust tags: standalone section after the product");
   console.log("   ✓ defaults hidden; Notes, Details, How to Use kept; trust tags standalone");
 })();
 

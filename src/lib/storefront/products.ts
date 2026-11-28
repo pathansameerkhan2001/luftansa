@@ -85,10 +85,13 @@ export function toStorefrontOptions(variants: readonly ProductVariantItem[]): Pr
 
 function mapNotes(items: readonly FragranceNoteItem[] = []): StorefrontNote[] {
   return items.map((n) => {
-    const src = resolveAssetUrl(n.imageKey);
-    // Keep the descriptive alt text of the curated note photography when it is used.
+    // The photo uploaded for this note in Admin → Products wins; a note without one
+    // uses the curated ingredient photography (if any) instead of an empty circle.
     const curated = getNoteImage(n.name);
-    const alt = curated && curated.src === n.imageKey ? curated.alt : n.name;
+    const uploaded = resolveAssetUrl(n.imageKey);
+    const src = uploaded ?? curated?.src;
+    // Keep the descriptive alt text of the curated note photography when it is used.
+    const alt = curated && (!uploaded || curated.src === n.imageKey) ? curated.alt : n.name;
     return { name: n.name, description: n.description, image: src ? { src, alt } : undefined };
   });
 }
